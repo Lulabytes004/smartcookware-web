@@ -120,7 +120,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.1.0 - Build 20241212-001</div>
+    <div class="version-info">Versión 2.2.0 - Build 20241212-002</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -157,31 +157,54 @@
     <div class="card hidden" id="controlsCard">
         <h2>Controles de Receta</h2>
         
-        <!-- Control para enviar paso de receta -->
+        <!-- Control para enviar paso de receta - MEJORADO -->
         <div class="input-group">
-            <label>Configurar Paso de Receta:</label>
+            <label>📋 Característica BLE: Steps (Configuración de Paso):</label>
             <div class="flex-container">
-                <input type="number" id="stepNumber" placeholder="Paso" min="1" max="10" value="1">
-                <input type="number" id="totalStepsInput" placeholder="Total" min="1" max="10" value="5">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Paso:</label>
+                    <input type="number" id="stepNumber" placeholder="Paso actual" min="0" max="10" value="1">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Total Pasos:</label>
+                    <input type="number" id="totalStepsInput" placeholder="Total de pasos" min="0" max="10" value="5">
+                </div>
             </div>
             <div class="flex-container">
-                <input type="number" id="targetTemp" placeholder="Temp. objetivo (°C)" min="0" max="300" value="180">
-                <select id="actionRequired">
-                    <option value="0">Sin acción requerida</option>
-                    <option value="1">Acción requerida</option>
-                </select>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Acción Requerida:</label>
+                    <select id="actionRequired">
+                        <option value="0">Sin acción requerida</option>
+                        <option value="1">⚠️ Acción requerida</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Temperatura Setpoint:</label>
+                    <input type="number" id="targetTemp" placeholder="Temp. objetivo (°C)" min="0" max="300" value="180">
+                </div>
             </div>
-            <button class="button-small" onclick="sendRecipeStepManual()">Enviar Paso</button>
+            <button class="button-small" onclick="sendRecipeStepManual()" style="width: 100%; margin-top: 10px;">📤 Enviar Configuración de Paso</button>
         </div>
         
-        <!-- Control para enviar progreso de tiempo -->
+        <!-- Control para enviar progreso de tiempo - MEJORADO -->
         <div class="input-group">
-            <label>Configurar Tiempo:</label>
+            <label>⏱️ Característica BLE: Progress (Tiempo del Paso):</label>
             <div class="flex-container">
-                <input type="number" id="remainingTimeInput" placeholder="Tiempo restante (seg)" min="0" max="3600" value="300">
-                <input type="number" id="totalTimeInput" placeholder="Tiempo total (seg)" min="1" max="3600" value="600">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Remaining Time (seg):</label>
+                    <input type="number" id="remainingTimeInput" placeholder="Tiempo restante" min="0" max="7200" value="300">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">Total Step Time (seg):</label>
+                    <input type="number" id="totalTimeInput" placeholder="Tiempo total del paso" min="1" max="7200" value="600">
+                </div>
             </div>
-            <button class="button-small" onclick="sendRecipeProgressManual()">Enviar Tiempo</button>
+            <div style="display: flex; gap: 10px; font-size: 12px; color: #666; margin-top: 5px;">
+                <span>Ejemplo: 300 seg = 5:00 min</span>
+                <span>|</span>
+                <span>1800 seg = 30:00 min</span>
+            </div>
+            <button class="button-small" onclick="sendRecipeProgressManual()" style="width: 100%; margin-top: 10px;">⏰ Enviar Tiempo del Paso</button>
         </div>
         
         <!-- Recetas predefinidas -->
@@ -201,9 +224,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.1.0');
-        console.log('Build: 20241212-001');
-        console.log('Características: Controles manuales, Recetas predefinidas, UI mejorada');
+        console.log('SmartCookware Web App - Versión 2.2.0');
+        console.log('Build: 20241212-002');
+        console.log('Características: Campos BLE mejorados, Labels específicos, UI clarificada');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -254,7 +277,7 @@
         async function connectToDevice() {
             try {
                 statusText.textContent = 'Buscando dispositivos...';
-                console.log('Intentando conectar... (v2.1.0)');
+                console.log('Intentando conectar... (v2.2.0)');
                 
                 // Cambiamos a especificar directamente todos los servicios
                 // sin hacer referencia a las variables constantes
@@ -319,7 +342,7 @@
                 
                 // Debug para verificar que se muestran los controles
                 console.log('Controles mostrados:', !controlsCard.classList.contains('hidden'));
-                console.log('Versión de la app:', '2.1.0');
+                console.log('Versión de la app:', '2.2.0');
                 
             } catch (error) {
                 console.error('Error al conectar:', error);
@@ -485,44 +508,50 @@
         
         async function sendRecipeStepManual() {
             if (!stepsCharacteristic) {
-                alert('Dispositivo no conectado o característica no disponible');
+                alert('Dispositivo no conectado o característica Steps no disponible');
                 return;
             }
             
             const step = parseInt(document.getElementById('stepNumber').value);
             const totalSteps = parseInt(document.getElementById('totalStepsInput').value);
-            const tempTarget = parseInt(document.getElementById('targetTemp').value);
+            const tempSetpoint = parseInt(document.getElementById('targetTemp').value);
             const actionReq = parseInt(document.getElementById('actionRequired').value);
             
-            if (isNaN(step) || isNaN(totalSteps) || isNaN(tempTarget) || step < 0 || totalSteps < 0 || tempTarget < 0) {
-                alert('Por favor, completa todos los campos con valores válidos');
+            if (isNaN(step) || isNaN(totalSteps) || isNaN(tempSetpoint) || step < 0 || totalSteps < 0 || tempSetpoint < 0) {
+                alert('Por favor, completa todos los campos con valores válidos:\n- Paso: 0-10\n- Total Pasos: 0-10\n- Temperatura: 0-300°C');
                 return;
             }
             
-            console.log(`Enviando paso: ${step}/${totalSteps}, Temp: ${tempTarget}°C, Acción requerida: ${actionReq}`);
+            console.log(`📋 Steps BLE - Paso: ${step}/${totalSteps}, Setpoint: ${tempSetpoint}°C, Acción: ${actionReq ? 'Requerida' : 'No requerida'}`);
             
-            await sendRecipeStep(step, totalSteps, actionReq === 1, tempTarget);
-            statusText.textContent = `✅ Paso ${step}/${totalSteps} enviado (${tempTarget}°C)`;
+            await sendRecipeStep(step, totalSteps, actionReq === 1, tempSetpoint);
+            statusText.textContent = `✅ Steps enviado: Paso ${step}/${totalSteps}, ${tempSetpoint}°C, ${actionReq ? 'Con acción' : 'Sin acción'}`;
         }
         
         async function sendRecipeProgressManual() {
             if (!progressCharacteristic) {
-                alert('Dispositivo no conectado o característica no disponible');
+                alert('Dispositivo no conectado o característica Progress no disponible');
                 return;
             }
             
             const remainingTime = parseInt(document.getElementById('remainingTimeInput').value);
-            const totalTime = parseInt(document.getElementById('totalTimeInput').value);
+            const totalStepTime = parseInt(document.getElementById('totalTimeInput').value);
             
-            if (isNaN(remainingTime) || isNaN(totalTime) || remainingTime < 0 || totalTime <= 0 || remainingTime > totalTime) {
-                alert('Tiempo inválido. El tiempo restante debe ser menor o igual al total');
+            if (isNaN(remainingTime) || isNaN(totalStepTime) || remainingTime < 0 || totalStepTime <= 0 || remainingTime > totalStepTime) {
+                alert('Tiempo inválido. Verificar:\n- Remaining Time: 0-7200 seg\n- Total Step Time: 1-7200 seg\n- Remaining ≤ Total');
                 return;
             }
             
-            console.log(`Enviando tiempo: ${remainingTime}/${totalTime} segundos`);
+            // Convertir a formato mm:ss para mostrar
+            const remainingMin = Math.floor(remainingTime / 60);
+            const remainingSec = remainingTime % 60;
+            const totalMin = Math.floor(totalStepTime / 60);
+            const totalSec = totalStepTime % 60;
             
-            await sendRecipeProgress(remainingTime, totalTime);
-            statusText.textContent = `⏱️ Tiempo actualizado: ${Math.floor(remainingTime/60)}:${(remainingTime%60).toString().padStart(2,'0')} / ${Math.floor(totalTime/60)}:${(totalTime%60).toString().padStart(2,'0')}`;
+            console.log(`⏱️ Progress BLE - Remaining: ${remainingTime}s (${remainingMin}:${remainingSec.toString().padStart(2,'0')}), Total Step: ${totalStepTime}s (${totalMin}:${totalSec.toString().padStart(2,'0')})`);
+            
+            await sendRecipeProgress(remainingTime, totalStepTime);
+            statusText.textContent = `⏱️ Progress enviado: ${remainingMin}:${remainingSec.toString().padStart(2,'0')} / ${totalMin}:${totalSec.toString().padStart(2,'0')}`;
         }
         
         // Recetas mejoradas con más detalle
@@ -650,13 +679,20 @@
             }, 2000);
         }
         
-        // Añadir función para mostrar información de versión
+        // Añadir función para mostrar información de versión - ACTUALIZADA
         function showVersionInfo() {
             const versionDetails = `
 SmartCookware Web App
-Versión: 2.1.0
-Build: 20241212-001
+Versión: 2.2.0
+Build: 20241212-002
 Fecha: ${new Date().toLocaleDateString()}
+
+Nuevas características v2.2.0:
+✓ Campos BLE específicos y etiquetados
+✓ Labels claros para Steps y Progress
+✓ Validaciones mejoradas
+✓ Conversión automática tiempo (seg → mm:ss)
+✓ Mensajes de estado más informativos
 
 Características incluidas:
 ✓ Conexión BLE con SmartCookware
@@ -665,7 +701,6 @@ Características incluidas:
 ✓ Controles manuales de receta
 ✓ Recetas predefinidas (Paella, Filete, Pasta)
 ✓ Sistema de acciones requeridas
-✓ Interfaz de usuario mejorada
 
 Compatibilidad:
 • Chrome para Android
@@ -676,11 +711,12 @@ Compatibilidad:
             alert(versionDetails);
         }
         
-        // Mostrar versión en la consola al cargar
+        // Mostrar versión en la consola al cargar - ACTUALIZADO
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.1.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-001');
+            console.log('%c SmartCookware Web App v2.2.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-002');
             console.log('Loaded at:', new Date().toLocaleString());
+            console.log('New features: Improved BLE field labels, better validation, time conversion');
         });
     </script>
 </body>
