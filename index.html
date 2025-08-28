@@ -120,7 +120,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.2.0 - Build 20241212-002</div>
+    <div class="version-info">Versión 2.3.0 - Build 20241212-003</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -224,9 +224,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.2.0');
-        console.log('Build: 20241212-002');
-        console.log('Características: Campos BLE mejorados, Labels específicos, UI clarificada');
+        console.log('SmartCookware Web App - Versión 2.3.0');
+        console.log('Build: 20241212-003');
+        console.log('Características: Contador automático de tiempo, Actualización en tiempo real');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -379,6 +379,9 @@
             progressCharacteristic = null;
             stepsCharacteristic = null;
             continueCharacteristic = null;
+            
+            // Detener el timer automático al desconectar
+            stopAutomaticTimer();
         }
         
         function handleBatteryChange(event) {
@@ -550,8 +553,97 @@
             
             console.log(`⏱️ Progress BLE - Remaining: ${remainingTime}s (${remainingMin}:${remainingSec.toString().padStart(2,'0')}), Total Step: ${totalStepTime}s (${totalMin}:${totalSec.toString().padStart(2,'0')})`);
             
+            // Enviar el tiempo inicial
             await sendRecipeProgress(remainingTime, totalStepTime);
-            statusText.textContent = `⏱️ Progress enviado: ${remainingMin}:${remainingSec.toString().padStart(2,'0')} / ${totalMin}:${totalSec.toString().padStart(2,'0')}`;
+            
+            // Iniciar el contador automático
+            startAutomaticTimer(remainingTime, totalStepTime);
+            
+            statusText.textContent = `⏱️ Timer iniciado: ${remainingMin}:${remainingSec.toString().padStart(2,'0')} / ${totalMin}:${totalSec.toString().padStart(2,'0')} (Auto-descuento activado)`;
+        }
+        
+        // Función para iniciar el contador automático
+        function startAutomaticTimer(remainingTime, totalTime) {
+            // Detener cualquier timer anterior
+            stopAutomaticTimer();
+            
+            currentRemainingTime = remainingTime;
+            currentTotalTime = totalTime;
+            isTimerActive = true;
+            
+            console.log(`⏰ Iniciando contador automático: ${remainingTime}s de ${totalTime}s`);
+            
+            // Actualizar UI inmediatamente
+            updateTimeDisplay(currentRemainingTime, currentTotalTime);
+            
+            // Iniciar intervalo de 1 segundo
+            timerInterval = setInterval(async () => {
+                if (!isTimerActive || !device || !device.gatt.connected) {
+                    stopAutomaticTimer();
+                    return;
+                }
+                
+                // Decrementar tiempo
+                currentRemainingTime--;
+                
+                // Verificar si el tiempo se agotó
+                if (currentRemainingTime <= 0) {
+                    currentRemainingTime = 0;
+                    console.log('⏰ Tiempo agotado!');
+                    statusText.textContent = '⏰ ¡Tiempo del paso completado!';
+                    stopAutomaticTimer();
+                }
+                
+                // Actualizar UI local
+                updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                
+                // Enviar actualización al periférico
+                try {
+                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                } catch (error) {
+                    console.error('Error enviando actualización de tiempo:', error);
+                    // Si hay error de comunicación, detener el timer
+                    stopAutomaticTimer();
+                }
+                
+            }, 1000); // Cada 1000ms = 1 segundo
+        }
+        
+        // Función para detener el contador automático
+        function stopAutomaticTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                isTimerActive = false;
+                console.log('⏰ Contador automático detenido');
+            }
+        }
+        
+        // Función para enviar actualizaciones de tiempo (sin mostrar en UI)
+        async function sendRecipeProgressUpdate(remainingTime, totalTime) {
+            if (!progressCharacteristic) return;
+            
+            try {
+                // Crear array de 4 bytes:
+                // [remainingTime MSB, remainingTime LSB, totalTime MSB, totalTime LSB]
+                const data = new Uint8Array([
+                    (remainingTime >> 8) & 0xFF,
+                    remainingTime & 0xFF,
+                    (totalTime >> 8) & 0xFF,
+                    totalTime & 0xFF
+                ]);
+                
+                await progressCharacteristic.writeValue(data);
+                
+                // Solo log cada 10 segundos para no saturar la consola
+                if (remainingTime % 10 === 0 || remainingTime <= 5) {
+                    console.log(`⏰ Tiempo actualizado: ${remainingTime}s restantes de ${totalTime}s`);
+                }
+                
+            } catch (error) {
+                console.error('Error al enviar actualización de tiempo:', error);
+                throw error; // Re-lanzar para que el timer se detenga
+            }
         }
         
         // Recetas mejoradas con más detalle
@@ -566,25 +658,25 @@
             
             // Paso 1: Calentar aceite de oliva
             await sendRecipeStep(1, 4, false, 180);
-            await sendRecipeProgress(300, 300); // 5 minutos
+            await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
             
             setTimeout(async () => {
                 // Paso 2: Sofreír pollo y verduras - REQUIERE ACCIÓN
                 statusText.textContent = '🥘 Añadir pollo y verduras';
                 await sendRecipeStep(2, 4, true, 160);
-                await sendRecipeProgress(600, 600); // 10 minutos
+                await sendRecipeProgressWithTimer(600, 600); // 10 minutos con timer automático
                 
                 setTimeout(async () => {
                     // Paso 3: Añadir arroz y caldo
                     statusText.textContent = '🥘 Añadir arroz y caldo';
                     await sendRecipeStep(3, 4, true, 100);
-                    await sendRecipeProgress(1200, 1200); // 20 minutos
+                    await sendRecipeProgressWithTimer(1200, 1200); // 20 minutos con timer automático
                     
                     setTimeout(async () => {
                         // Paso 4: Socarrat final
                         statusText.textContent = '🥘 Socarrat final';
                         await sendRecipeStep(4, 4, false, 200);
-                        await sendRecipeProgress(300, 300); // 5 minutos
+                        await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
                     }, 3000);
                 }, 3000);
             }, 2000);
@@ -600,19 +692,19 @@
             
             // Paso 1: Precalentar sartén bien caliente
             await sendRecipeStep(1, 3, false, 240);
-            await sendRecipeProgress(240, 240); // 4 minutos
+            await sendRecipeProgressWithTimer(240, 240); // 4 minutos con timer automático
             
             setTimeout(async () => {
                 // Paso 2: Añadir filete - REQUIERE ACCIÓN
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendRecipeStep(2, 3, true, 220);
-                await sendRecipeProgress(300, 300); // 5 minutos primer lado
+                await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
                 
                 setTimeout(async () => {
                     // Paso 3: Voltear filete - REQUIERE ACCIÓN
                     statusText.textContent = '🥩 Voltear el filete';
                     await sendRecipeStep(3, 3, true, 200);
-                    await sendRecipeProgress(240, 240); // 4 minutos segundo lado
+                    await sendRecipeProgressWithTimer(240, 240); // 4 minutos con timer automático
                 }, 3000);
             }, 2000);
         }
@@ -627,72 +719,57 @@
             
             // Paso 1: Hervir agua con sal
             await sendRecipeStep(1, 3, false, 100);
-            await sendRecipeProgress(480, 480); // 8 minutos para hervir
+            await sendRecipeProgressWithTimer(480, 480); // 8 minutos con timer automático
             
             setTimeout(async () => {
                 // Paso 2: Añadir pasta - REQUIERE ACCIÓN
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendRecipeStep(2, 3, true, 100);
-                await sendRecipeProgress(600, 600); // 10 minutos cocción
+                await sendRecipeProgressWithTimer(600, 600); // 10 minutos con timer automático
                 
                 setTimeout(async () => {
                     // Paso 3: Escurrir pasta - REQUIERE ACCIÓN
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendRecipeStep(3, 3, true, 0);
-                    await sendRecipeProgress(60, 60); // 1 minuto para escurrir
+                    await sendRecipeProgressWithTimer(60, 60); // 1 minuto con timer automático
                 }, 3000);
             }, 2000);
         }
         
-        // Nueva receta: Tortilla Española
-        async function startTortillaRecipe() {
+        async function resetRecipe() {
             if (!device || !device.gatt.connected) {
                 alert('Dispositivo no conectado');
                 return;
             }
             
-            statusText.textContent = '🥚 Iniciando Tortilla Española...';
+            // Detener el timer automático
+            stopAutomaticTimer();
             
-            // Paso 1: Confitar patatas
-            await sendRecipeStep(1, 4, false, 140);
-            await sendRecipeProgress(900, 900); // 15 minutos
+            // Enviar paso 0 para resetear
+            await sendRecipeStep(0, 0, false, 0);
+            await sendRecipeProgress(0, 0);
             
-            setTimeout(async () => {
-                // Paso 2: Añadir huevos - REQUIERE ACCIÓN
-                statusText.textContent = '🥚 Mezclar patatas con huevos';
-                await sendRecipeStep(2, 4, true, 0);
-                await sendRecipeProgress(120, 120); // 2 minutos mezclar
-                
-                setTimeout(async () => {
-                    // Paso 3: Cuajar primer lado
-                    statusText.textContent = '🥚 Cuajar primer lado';
-                    await sendRecipeStep(3, 4, false, 160);
-                    await sendRecipeProgress(360, 360); // 6 minutos
-                    
-                    setTimeout(async () => {
-                        // Paso 4: Voltear tortilla - REQUIERE ACCIÓN
-                        statusText.textContent = '🥚 Voltear la tortilla';
-                        await sendRecipeStep(4, 4, true, 140);
-                        await sendRecipeProgress(240, 240); // 4 minutos
-                    }, 3000);
-                }, 3000);
-            }, 2000);
+            // Ocultar tarjetas de progreso y acción
+            recipeProgressCard.classList.add('hidden');
+            actionRequiredCard.classList.add('hidden');
+            setpointContainer.classList.add('hidden');
+            
+            statusText.textContent = 'Receta reseteada (Timer detenido)';
         }
         
         // Añadir función para mostrar información de versión - ACTUALIZADA
         function showVersionInfo() {
             const versionDetails = `
 SmartCookware Web App
-Versión: 2.2.0
-Build: 20241212-002
+Versión: 2.3.0
+Build: 20241212-003
 Fecha: ${new Date().toLocaleDateString()}
 
-Nuevas características v2.2.0:
-✓ Campos BLE específicos y etiquetados
-✓ Labels claros para Steps y Progress
-✓ Validaciones mejoradas
-✓ Conversión automática tiempo (seg → mm:ss)
-✓ Mensajes de estado más informativos
+Nuevas características v2.3.0:
+✓ Contador automático de tiempo
+✓ Actualización en tiempo real del progreso
+✓ Mejoras en la estabilidad de conexión
+✓ Nuevas recetas detalladas
 
 Características incluidas:
 ✓ Conexión BLE con SmartCookware
@@ -713,10 +790,10 @@ Compatibilidad:
         
         // Mostrar versión en la consola al cargar - ACTUALIZADO
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.2.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-002');
-            console.log('Loaded at:', new Date().toLocaleString());
-            console.log('New features: Improved BLE field labels, better validation, time conversion');
+            console.log('%c SmartCookware Web App v2.3.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-003');
+            console.log('Loaded at:', new Date().toLocaleDateString());
+            console.log('New features: Automatic countdown timer, Real-time progress updates');
         });
     </script>
 </body>
