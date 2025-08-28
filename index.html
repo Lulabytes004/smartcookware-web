@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCookware - Control BLE</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            font-size: 16px;
+            margin: 5px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 100%;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        .temperature {
+            font-size: 36px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .status {
+            font-size: 14px;
+            color: #555;
+            text-align: center;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #ddd;
+            border-radius: 5px;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+        }
+        .step-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .action-required {
+            background-color: #f44336;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin: 15px 0;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>SmartCookware</h1>
+    
+    <div class="card">
+        <button id="connectButton">Conectar dispositivo</button>
+        <p class="status" id="statusText">Desconectado</p>
+        <p class="status" id="batteryText"></p>
+    </div>
+    
+    <div class="card hidden" id="temperatureCard">
+        <h2>Temperatura</h2>
+        <div class="temperature" id="currentTemp">--°C</div>
+        <div id="setpointContainer" class="hidden">
+            <p>Temperatura objetivo: <span id="tempSetpoint">--°C</span></p>
+        </div>
+    </div>
+    
+    <div class="card hidden" id="recipeProgressCard">
+        <h2>Progreso de receta</h2>
+        <div class="step-info">
+            <span id="stepInfo">Paso: --/--</span>
+            <span id="timeRemaining">--:--</span>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar" style="width:0%">0%</div>
+        </div>
+    </div>
+    
+    <div class="action-required hidden" id="actionRequiredCard">
+        <h2>¡ACCIÓN REQUERIDA!</h2>
+        <p>Por favor, realiza la acción necesaria y pulsa el botón cuando hayas terminado.</p>
+        <button id="continueButton">CONTINUAR</button>
+    </div>
+
+    <script>
+        // UUIDs de los servicios y características BLE
+        const BATTERY_SERVICE_UUID = '180f';
+        const BATTERY_CHARACTERISTIC_UUID = '2a19';
+        const COOKING_SERVICE_UUID = 'abcd1234-5678-9012-3456-7890abcdef12';
+        const TEMP_CHARACTERISTIC_UUID = 'abcd1234-0001-9012-3456-7890abcdef12';
+        const PROGRESS_CHARACTERISTIC_UUID = 'abcd1234-0002-9012-3456-7890abcdef12';
+        const STEPS_CHARACTERISTIC_UUID = 'abcd1234-0003-9012-3456-7890abcdef12';
+        const CONTINUE_CHARACTERISTIC_UUID = 'abcd1234-0005-9012-3456-7890abcdef12';
+        
+        // Variables globales
+        let device = null;
+        let batteryCharacteristic = null;
+        let tempCharacteristic = null;
+        let progressCharacteristic = null;
+        let stepsCharacteristic = null;
+        let continueCharacteristic = null;
+        
+        // Elementos del DOM
+        const connectButton = document.getElementById('connectButton');
+        const statusText = document.getElementById('statusText');
+        const batteryText = document.getElementById('batteryText');
+        const temperatureCard = document.getElementById('temperatureCard');
+        const currentTemp = document.getElementById('currentTemp');
+        const setpointContainer = document.getElementById('setpointContainer');
+        const tempSetpoint = document.getElementById('tempSetpoint');
+        const recipeProgressCard = document.getElementById('recipeProgressCard');
+        const stepInfo = document.getElementById('stepInfo');
+        const timeRemaining = document.getElementById('timeRemaining');
+        const progressBar = document.getElementById('progressBar');
+        const actionRequiredCard = document.getElementById('actionRequiredCard');
+        const continueButton = document.getElementById('continueButton');
+        
+        // Eventos
+        connectButton.addEventListener('click', connectToDevice);
+        continueButton.addEventListener('click', sendContinueSignal);
+        
+        // Verificar si el navegador soporta Web Bluetooth
+        if (!navigator.bluetooth) {
+            statusText.textContent = 'Web Bluetooth no soportado por este navegador';
+            connectButton.disabled = true;
+        }
+        
+        async function connectToDevice() {
+            try {
+                statusText.textContent = 'Buscando dispositivos...';
+                
+                // Solicitar dispositivo BLE
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'SmartCookware' }],
+                    optionalServices: [
+                        BATTERY_SERVICE_UUID,
+                        COOKING_SERVICE_UUID
+                    ]
+                });
+                
+                statusText.textContent = 'Conectando...';
+                
+                // Conectar al dispositivo
+                const server = await device.gatt.connect();
+                
+                // Manejar desconexiones
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+                
+                // Obtener servicio de batería
+                const batteryService = await server.getPrimaryService(BATTERY_SERVICE_UUID);
+                batteryCharacteristic = await batteryService.getCharacteristic(BATTERY_CHARACTERISTIC_UUID);
+                
+                // Suscribirse a notificaciones de batería
+                await batteryCharacteristic.startNotifications();
+                batteryCharacteristic.addEventListener('characteristicvaluechanged', handleBatteryChange);
+                
+                // Leer nivel de batería inicial
+                const batteryValue = await batteryCharacteristic.readValue();
+                updateBatteryLevel(batteryValue);
+                
+                // Obtener servicio de cocina
+                const cookingService = await server.getPrimaryService(COOKING_SERVICE_UUID);
+                
+                // Obtener características
+                tempCharacteristic = await cookingService.getCharacteristic(TEMP_CHARACTERISTIC_UUID);
+                progressCharacteristic = await cookingService.getCharacteristic(PROGRESS_CHARACTERISTIC_UUID);
+                stepsCharacteristic = await cookingService.getCharacteristic(STEPS_CHARACTERISTIC_UUID);
+                continueCharacteristic = await cookingService.getCharacteristic(CONTINUE_CHARACTERISTIC_UUID);
+                
+                // Suscribirse a notificaciones de temperatura
+                await tempCharacteristic.startNotifications();
+                tempCharacteristic.addEventListener('characteristicvaluechanged', handleTemperatureChange);
+                
+                // Suscribirse a notificaciones de continuar
+                await continueCharacteristic.startNotifications();
+                continueCharacteristic.addEventListener('characteristicvaluechanged', handleContinueChange);
+                
+                // Leer temperatura inicial
+                const tempValue = await tempCharacteristic.readValue();
+                updateTemperature(tempValue);
+                
+                // Actualizar UI
+                statusText.textContent = 'Conectado';
+                connectButton.textContent = 'Desconectar';
+                connectButton.removeEventListener('click', connectToDevice);
+                connectButton.addEventListener('click', disconnectDevice);
+                
+                // Mostrar tarjeta de temperatura
+                temperatureCard.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error al conectar:', error);
+                statusText.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        function disconnectDevice() {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+        }
+        
+        function onDisconnected() {
+            statusText.textContent = 'Desconectado';
+            batteryText.textContent = '';
+            connectButton.textContent = 'Conectar dispositivo';
+            connectButton.removeEventListener('click', disconnectDevice);
+            connectButton.addEventListener('click', connectToDevice);
+            
+            // Ocultar tarjetas
+            temperatureCard.classList.add('hidden');
+            recipeProgressCard.classList.add('hidden');
+            actionRequiredCard.classList.add('hidden');
+            
+            // Resetear variables
+            device = null;
+            batteryCharacteristic = null;
+            tempCharacteristic = null;
+            progressCharacteristic = null;
+            stepsCharacteristic = null;
+            continueCharacteristic = null;
+        }
+        
+        function handleBatteryChange(event) {
+            updateBatteryLevel(event.target.value);
+        }
+        
+        function updateBatteryLevel(value) {
+            const batteryLevel = value.getUint8(0);
+            batteryText.textContent = `Batería: ${batteryLevel}%`;
+        }
+        
+        function handleTemperatureChange(event) {
+            updateTemperature(event.target.value);
+        }
+        
+        function updateTemperature(value) {
+            // La temperatura es un uint16 (2 bytes)
+            const temp = value.getUint16(0, false); // false = big-endian
+            currentTemp.textContent = `${temp}°C`;
+        }
+        
+        function handleContinueChange(event) {
+            const continueValue = event.target.value.getUint8(0);
+            if (continueValue === 1) {
+                // La acción ya fue atendida en el dispositivo
+                actionRequiredCard.classList.add('hidden');
+            }
+        }
+        
+        async function sendContinueSignal() {
+            if (!continueCharacteristic) return;
+            
+            try {
+                // Enviar señal de continuar (valor 1)
+                const value = new Uint8Array([1]);
+                await continueCharacteristic.writeValue(value);
+                
+                // Ocultar tarjeta de acción requerida
+                actionRequiredCard.classList.add('hidden');
+                
+                statusText.textContent = 'Acción completada';
+            } catch (error) {
+                console.error('Error al enviar señal de continuar:', error);
+                statusText.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        // Funciones para enviar datos al dispositivo
+        
+        async function sendRecipeStep(step, totalSteps, actionRequired, tempTarget) {
+            if (!stepsCharacteristic) return;
+            
+            try {
+                // Crear array de 5 bytes:
+                // [paso actual, total pasos, acción requerida, tempTarget MSB, tempTarget LSB]
+                const data = new Uint8Array([
+                    step, 
+                    totalSteps,
+                    actionRequired ? 1 : 0,
+                    (tempTarget >> 8) & 0xFF,
+                    tempTarget & 0xFF
+                ]);
+                
+                await stepsCharacteristic.writeValue(data);
+                
+                // Actualizar UI según los valores enviados
+                stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
+                recipeProgressCard.classList.remove('hidden');
+                
+                if (tempTarget > 0) {
+                    tempSetpoint.textContent = `${tempTarget}°C`;
+                    setpointContainer.classList.remove('hidden');
+                }
+                
+                if (actionRequired) {
+                    actionRequiredCard.classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error al enviar paso de receta:', error);
+                statusText.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        async function sendRecipeProgress(remainingTime, totalTime) {
+            if (!progressCharacteristic) return;
+            
+            try {
+                // Crear array de 4 bytes:
+                // [remainingTime MSB, remainingTime LSB, totalTime MSB, totalTime LSB]
+                const data = new Uint8Array([
+                    (remainingTime >> 8) & 0xFF,
+                    remainingTime & 0xFF,
+                    (totalTime >> 8) & 0xFF,
+                    totalTime & 0xFF
+                ]);
+                
+                await progressCharacteristic.writeValue(data);
+                
+                // Actualizar UI
+                updateTimeDisplay(remainingTime, totalTime);
+                
+            } catch (error) {
+                console.error('Error al enviar progreso de receta:', error);
+            }
+        }
+        
+        function updateTimeDisplay(remainingTime, totalTime) {
+            // Calcular minutos y segundos
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            
+            // Formatear tiempo (mm:ss)
+            const timeStr = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            timeRemaining.textContent = timeStr;
+            
+            // Actualizar barra de progreso
+            let progress = 0;
+            if (totalTime > 0) {
+                progress = Math.floor(100 * (1 - remainingTime / totalTime));
+            }
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+        }
+        
+        // Ejemplo de uso (esto es para demostración):
+        /*
+        // Simular el envío de un paso de receta después de la conexión
+        setTimeout(() => {
+            if (device && device.gatt.connected) {
+                // Enviar: paso 1 de 5, sin acción requerida, temperatura objetivo 180°C
+                sendRecipeStep(1, 5, false, 180);
+                
+                // Enviar: tiempo restante 5 minutos (300 segundos), tiempo total 10 minutos
+                sendRecipeProgress(300, 600);
+            }
+        }, 2000);
+        */
+    </script>
+</body>
+</html>
