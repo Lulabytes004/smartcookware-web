@@ -111,8 +111,9 @@
 
     <script>
         // UUIDs de los servicios y características BLE
-        const BATTERY_SERVICE_UUID = '180f';
-        const BATTERY_CHARACTERISTIC_UUID = '2a19';
+        // Corregidos a formato UUID completo para compatibilidad
+        const BATTERY_SERVICE_UUID = '0000180f-0000-1000-8000-00805f9b34fb';
+        const BATTERY_CHARACTERISTIC_UUID = '00002a19-0000-1000-8000-00805f9b34fb';
         const COOKING_SERVICE_UUID = 'abcd1234-5678-9012-3456-7890abcdef12';
         const TEMP_CHARACTERISTIC_UUID = 'abcd1234-0001-9012-3456-7890abcdef12';
         const PROGRESS_CHARACTERISTIC_UUID = 'abcd1234-0002-9012-3456-7890abcdef12';
