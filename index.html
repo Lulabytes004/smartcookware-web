@@ -108,10 +108,19 @@
         .flex-container input {
             flex: 1;
         }
+        
+        .version-info {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <h1>SmartCookware</h1>
+    <div class="version-info">Versión 2.1.0 - Build 20241212-001</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -191,6 +200,11 @@
     </div>
 
     <script>
+        // Mostrar información de versión en la consola para debug
+        console.log('SmartCookware Web App - Versión 2.1.0');
+        console.log('Build: 20241212-001');
+        console.log('Características: Controles manuales, Recetas predefinidas, UI mejorada');
+        
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
         const BATTERY_SERVICE_UUID = '0000180f-0000-1000-8000-00805f9b34fb';
@@ -240,7 +254,7 @@
         async function connectToDevice() {
             try {
                 statusText.textContent = 'Buscando dispositivos...';
-                console.log('Intentando conectar...');
+                console.log('Intentando conectar... (v2.1.0)');
                 
                 // Cambiamos a especificar directamente todos los servicios
                 // sin hacer referencia a las variables constantes
@@ -305,6 +319,7 @@
                 
                 // Debug para verificar que se muestran los controles
                 console.log('Controles mostrados:', !controlsCard.classList.contains('hidden'));
+                console.log('Versión de la app:', '2.1.0');
                 
             } catch (error) {
                 console.error('Error al conectar:', error);
@@ -634,6 +649,39 @@
                 }, 3000);
             }, 2000);
         }
+        
+        // Añadir función para mostrar información de versión
+        function showVersionInfo() {
+            const versionDetails = `
+SmartCookware Web App
+Versión: 2.1.0
+Build: 20241212-001
+Fecha: ${new Date().toLocaleDateString()}
+
+Características incluidas:
+✓ Conexión BLE con SmartCookware
+✓ Monitoreo de temperatura en tiempo real
+✓ Monitoreo de batería
+✓ Controles manuales de receta
+✓ Recetas predefinidas (Paella, Filete, Pasta)
+✓ Sistema de acciones requeridas
+✓ Interfaz de usuario mejorada
+
+Compatibilidad:
+• Chrome para Android
+• Chrome para Desktop
+• Microsoft Edge (versiones recientes)
+            `;
+            
+            alert(versionDetails);
+        }
+        
+        // Mostrar versión en la consola al cargar
+        window.addEventListener('load', () => {
+            console.log('%c SmartCookware Web App v2.1.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-001');
+            console.log('Loaded at:', new Date().toLocaleString());
+        });
     </script>
 </body>
 </html>
