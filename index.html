@@ -110,10 +110,12 @@
     </div>
 
     <script>
-        // UUIDs de los servicios y características BLE - corregidos nuevamente
-        // Usamos nombres estándar para los servicios Bluetooth oficiales
-        const BATTERY_SERVICE_UUID = 'battery_service';
-        const BATTERY_CHARACTERISTIC_UUID = 'battery_level';
+        // UUIDs de los servicios y características BLE - usando formato UUID completo
+        // Para los servicios estándar, usamos el formato completo
+        const BATTERY_SERVICE_UUID = '0000180f-0000-1000-8000-00805f9b34fb';
+        const BATTERY_CHARACTERISTIC_UUID = '00002a19-0000-1000-8000-00805f9b34fb';
+        
+        // Para servicios personalizados, mantenemos el UUID tal como está
         const COOKING_SERVICE_UUID = 'abcd1234-5678-9012-3456-7890abcdef12';
         const TEMP_CHARACTERISTIC_UUID = 'abcd1234-0001-9012-3456-7890abcdef12';
         const PROGRESS_CHARACTERISTIC_UUID = 'abcd1234-0002-9012-3456-7890abcdef12';
@@ -158,13 +160,13 @@
                 statusText.textContent = 'Buscando dispositivos...';
                 console.log('Intentando conectar...');
                 
-                // Solicitar dispositivo BLE con más información de debug
-                console.log('Servicios solicitados:', BATTERY_SERVICE_UUID, COOKING_SERVICE_UUID);
+                // Cambiamos a especificar directamente todos los servicios
+                // sin hacer referencia a las variables constantes
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'SmartCookware' }],
                     optionalServices: [
-                        BATTERY_SERVICE_UUID,
-                        COOKING_SERVICE_UUID
+                        '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
+                        'abcd1234-5678-9012-3456-7890abcdef12'  // Cooking Service
                     ]
                 });
                 
@@ -176,9 +178,9 @@
                 // Manejar desconexiones
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 
-                // Obtener servicio de batería
-                const batteryService = await server.getPrimaryService(BATTERY_SERVICE_UUID);
-                batteryCharacteristic = await batteryService.getCharacteristic(BATTERY_CHARACTERISTIC_UUID);
+                // Obtener servicio de batería - usando directamente el UUID
+                const batteryService = await server.getPrimaryService('0000180f-0000-1000-8000-00805f9b34fb');
+                batteryCharacteristic = await batteryService.getCharacteristic('00002a19-0000-1000-8000-00805f9b34fb');
                 
                 // Suscribirse a notificaciones de batería
                 await batteryCharacteristic.startNotifications();
@@ -188,14 +190,14 @@
                 const batteryValue = await batteryCharacteristic.readValue();
                 updateBatteryLevel(batteryValue);
                 
-                // Obtener servicio de cocina
-                const cookingService = await server.getPrimaryService(COOKING_SERVICE_UUID);
+                // Obtener servicio de cocina - usando directamente el UUID
+                const cookingService = await server.getPrimaryService('abcd1234-5678-9012-3456-7890abcdef12');
                 
-                // Obtener características
-                tempCharacteristic = await cookingService.getCharacteristic(TEMP_CHARACTERISTIC_UUID);
-                progressCharacteristic = await cookingService.getCharacteristic(PROGRESS_CHARACTERISTIC_UUID);
-                stepsCharacteristic = await cookingService.getCharacteristic(STEPS_CHARACTERISTIC_UUID);
-                continueCharacteristic = await cookingService.getCharacteristic(CONTINUE_CHARACTERISTIC_UUID);
+                // Obtener características usando directamente los UUIDs
+                tempCharacteristic = await cookingService.getCharacteristic('abcd1234-0001-9012-3456-7890abcdef12');
+                progressCharacteristic = await cookingService.getCharacteristic('abcd1234-0002-9012-3456-7890abcdef12');
+                stepsCharacteristic = await cookingService.getCharacteristic('abcd1234-0003-9012-3456-7890abcdef12');
+                continueCharacteristic = await cookingService.getCharacteristic('abcd1234-0005-9012-3456-7890abcdef12');
                 
                 // Suscribirse a notificaciones de temperatura
                 await tempCharacteristic.startNotifications();
@@ -223,6 +225,7 @@
                 statusText.textContent = 'Error: ' + error.message;
                 // Mostrar más información de debug en la consola
                 console.log('Error detallado:', error);
+                alert('Error al conectar: ' + error.message);
             }
         }
         
