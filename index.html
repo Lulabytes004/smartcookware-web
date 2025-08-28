@@ -240,6 +240,12 @@
         const STEPS_CHARACTERISTIC_UUID = 'abcd1234-0003-9012-3456-7890abcdef12';
         const CONTINUE_CHARACTERISTIC_UUID = 'abcd1234-0005-9012-3456-7890abcdef12';
         
+        // Variables para el contador de tiempo automático - AÑADIR ESTAS VARIABLES
+        let timerInterval = null;
+        let currentRemainingTime = 0;
+        let currentTotalTime = 0;
+        let isTimerActive = false;
+        
         // Variables globales
         let device = null;
         let batteryCharacteristic = null;
