@@ -120,7 +120,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.3.0 - Build 20241212-003</div>
+    <div class="version-info">Versión 2.4.0 - Build 20241212-004</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -186,25 +186,22 @@
             <button class="button-small" onclick="sendRecipeStepManual()" style="width: 100%; margin-top: 10px;">📤 Enviar Configuración de Paso</button>
         </div>
         
-        <!-- Control para enviar progreso de tiempo - MEJORADO -->
+        <!-- Control para enviar progreso de tiempo - SIMPLIFICADO -->
         <div class="input-group">
             <label>⏱️ Característica BLE: Progress (Tiempo del Paso):</label>
-            <div class="flex-container">
-                <div style="flex: 1;">
-                    <label style="font-size: 12px; color: #666;">Remaining Time (seg):</label>
-                    <input type="number" id="remainingTimeInput" placeholder="Tiempo restante" min="0" max="7200" value="300">
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 12px; color: #666;">Total Step Time (seg):</label>
-                    <input type="number" id="totalTimeInput" placeholder="Tiempo total del paso" min="1" max="7200" value="600">
-                </div>
+            <div style="flex: 1; margin-bottom: 10px;">
+                <label style="font-size: 12px; color: #666;">Tiempo Total del Paso (seg):</label>
+                <input type="number" id="totalTimeInput" placeholder="Duración total del paso" min="1" max="7200" value="600">
             </div>
             <div style="display: flex; gap: 10px; font-size: 12px; color: #666; margin-top: 5px;">
                 <span>Ejemplo: 300 seg = 5:00 min</span>
                 <span>|</span>
                 <span>1800 seg = 30:00 min</span>
             </div>
-            <button class="button-small" onclick="sendRecipeProgressManual()" style="width: 100%; margin-top: 10px;">⏰ Enviar Tiempo del Paso</button>
+            <div style="font-size: 11px; color: #888; margin-top: 5px; font-style: italic;">
+                * Al enviar, se iniciará automáticamente desde el tiempo total especificado
+            </div>
+            <button class="button-small" onclick="sendRecipeProgressManual()" style="width: 100%; margin-top: 10px;">⏰ Iniciar Timer del Paso</button>
         </div>
         
         <!-- Recetas predefinidas -->
@@ -224,9 +221,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.3.0');
-        console.log('Build: 20241212-003');
-        console.log('Características: Contador automático de tiempo, Actualización en tiempo real');
+        console.log('SmartCookware Web App - Versión 2.4.0');
+        console.log('Build: 20241212-004');
+        console.log('Características: UI simplificada para tiempo, inicio automático desde tiempo total');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -543,116 +540,44 @@
                 return;
             }
             
-            const remainingTime = parseInt(document.getElementById('remainingTimeInput').value);
             const totalStepTime = parseInt(document.getElementById('totalTimeInput').value);
             
-            if (isNaN(remainingTime) || isNaN(totalStepTime) || remainingTime < 0 || totalStepTime <= 0 || remainingTime > totalStepTime) {
-                alert('Tiempo inválido. Verificar:\n- Remaining Time: 0-7200 seg\n- Total Step Time: 1-7200 seg\n- Remaining ≤ Total');
+            if (isNaN(totalStepTime) || totalStepTime <= 0) {
+                alert('Tiempo inválido. Verificar:\n- Tiempo Total del Paso: 1-7200 seg (1 seg a 2 horas)');
                 return;
             }
             
+            // Inicializar remaining time igual al total time
+            const remainingTime = totalStepTime;
+            
             // Convertir a formato mm:ss para mostrar
-            const remainingMin = Math.floor(remainingTime / 60);
-            const remainingSec = remainingTime % 60;
             const totalMin = Math.floor(totalStepTime / 60);
             const totalSec = totalStepTime % 60;
             
-            console.log(`⏱️ Progress BLE - Remaining: ${remainingTime}s (${remainingMin}:${remainingSec.toString().padStart(2,'0')}), Total Step: ${totalStepTime}s (${totalMin}:${totalSec.toString().padStart(2,'0')})`);
+            console.log(`⏱️ Progress BLE - Iniciando timer: ${totalStepTime}s (${totalMin}:${totalSec.toString().padStart(2,'0')}) - Remaining = Total al inicio`);
             
-            // Enviar el tiempo inicial
+            // Enviar el tiempo inicial (ambos valores iguales)
             await sendRecipeProgress(remainingTime, totalStepTime);
             
             // Iniciar el contador automático
             startAutomaticTimer(remainingTime, totalStepTime);
             
-            statusText.textContent = `⏱️ Timer iniciado: ${remainingMin}:${remainingSec.toString().padStart(2,'0')} / ${totalMin}:${totalSec.toString().padStart(2,'0')} (Auto-descuento activado)`;
+            statusText.textContent = `⏱️ Timer iniciado: ${totalMin}:${totalSec.toString().padStart(2,'0')} (Countdown automático activado)`;
         }
         
-        // Función para iniciar el contador automático
-        function startAutomaticTimer(remainingTime, totalTime) {
-            // Detener cualquier timer anterior
-            stopAutomaticTimer();
+        // Función mejorada para las recetas con timer automático
+        async function sendRecipeProgressWithTimer(totalTime) {
+            // Simplificar: remaining time = total time al inicio
+            const remainingTime = totalTime;
             
-            currentRemainingTime = remainingTime;
-            currentTotalTime = totalTime;
-            isTimerActive = true;
+            // Enviar el tiempo inicial
+            await sendRecipeProgress(remainingTime, totalTime);
             
-            console.log(`⏰ Iniciando contador automático: ${remainingTime}s de ${totalTime}s`);
-            
-            // Actualizar UI inmediatamente
-            updateTimeDisplay(currentRemainingTime, currentTotalTime);
-            
-            // Iniciar intervalo de 1 segundo
-            timerInterval = setInterval(async () => {
-                if (!isTimerActive || !device || !device.gatt.connected) {
-                    stopAutomaticTimer();
-                    return;
-                }
-                
-                // Decrementar tiempo
-                currentRemainingTime--;
-                
-                // Verificar si el tiempo se agotó
-                if (currentRemainingTime <= 0) {
-                    currentRemainingTime = 0;
-                    console.log('⏰ Tiempo agotado!');
-                    statusText.textContent = '⏰ ¡Tiempo del paso completado!';
-                    stopAutomaticTimer();
-                }
-                
-                // Actualizar UI local
-                updateTimeDisplay(currentRemainingTime, currentTotalTime);
-                
-                // Enviar actualización al periférico
-                try {
-                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
-                } catch (error) {
-                    console.error('Error enviando actualización de tiempo:', error);
-                    // Si hay error de comunicación, detener el timer
-                    stopAutomaticTimer();
-                }
-                
-            }, 1000); // Cada 1000ms = 1 segundo
+            // Iniciar contador automático
+            startAutomaticTimer(remainingTime, totalTime);
         }
         
-        // Función para detener el contador automático
-        function stopAutomaticTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                isTimerActive = false;
-                console.log('⏰ Contador automático detenido');
-            }
-        }
-        
-        // Función para enviar actualizaciones de tiempo (sin mostrar en UI)
-        async function sendRecipeProgressUpdate(remainingTime, totalTime) {
-            if (!progressCharacteristic) return;
-            
-            try {
-                // Crear array de 4 bytes:
-                // [remainingTime MSB, remainingTime LSB, totalTime MSB, totalTime LSB]
-                const data = new Uint8Array([
-                    (remainingTime >> 8) & 0xFF,
-                    remainingTime & 0xFF,
-                    (totalTime >> 8) & 0xFF,
-                    totalTime & 0xFF
-                ]);
-                
-                await progressCharacteristic.writeValue(data);
-                
-                // Solo log cada 10 segundos para no saturar la consola
-                if (remainingTime % 10 === 0 || remainingTime <= 5) {
-                    console.log(`⏰ Tiempo actualizado: ${remainingTime}s restantes de ${totalTime}s`);
-                }
-                
-            } catch (error) {
-                console.error('Error al enviar actualización de tiempo:', error);
-                throw error; // Re-lanzar para que el timer se detenga
-            }
-        }
-        
-        // Recetas mejoradas con más detalle
+        // Actualizar las recetas para usar la nueva función simplificada
         
         async function startPaellaRecipe() {
             if (!device || !device.gatt.connected) {
@@ -664,25 +589,25 @@
             
             // Paso 1: Calentar aceite de oliva
             await sendRecipeStep(1, 4, false, 180);
-            await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
+            await sendRecipeProgressWithTimer(300); // 5 minutos
             
             setTimeout(async () => {
                 // Paso 2: Sofreír pollo y verduras - REQUIERE ACCIÓN
                 statusText.textContent = '🥘 Añadir pollo y verduras';
                 await sendRecipeStep(2, 4, true, 160);
-                await sendRecipeProgressWithTimer(600, 600); // 10 minutos con timer automático
+                await sendRecipeProgressWithTimer(600); // 10 minutos
                 
                 setTimeout(async () => {
                     // Paso 3: Añadir arroz y caldo
                     statusText.textContent = '🥘 Añadir arroz y caldo';
                     await sendRecipeStep(3, 4, true, 100);
-                    await sendRecipeProgressWithTimer(1200, 1200); // 20 minutos con timer automático
+                    await sendRecipeProgressWithTimer(1200); // 20 minutos
                     
                     setTimeout(async () => {
                         // Paso 4: Socarrat final
                         statusText.textContent = '🥘 Socarrat final';
                         await sendRecipeStep(4, 4, false, 200);
-                        await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
+                        await sendRecipeProgressWithTimer(300); // 5 minutos
                     }, 3000);
                 }, 3000);
             }, 2000);
@@ -698,19 +623,19 @@
             
             // Paso 1: Precalentar sartén bien caliente
             await sendRecipeStep(1, 3, false, 240);
-            await sendRecipeProgressWithTimer(240, 240); // 4 minutos con timer automático
+            await sendRecipeProgressWithTimer(240); // 4 minutos
             
             setTimeout(async () => {
                 // Paso 2: Añadir filete - REQUIERE ACCIÓN
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendRecipeStep(2, 3, true, 220);
-                await sendRecipeProgressWithTimer(300, 300); // 5 minutos con timer automático
+                await sendRecipeProgressWithTimer(300); // 5 minutos
                 
                 setTimeout(async () => {
                     // Paso 3: Voltear filete - REQUIERE ACCIÓN
                     statusText.textContent = '🥩 Voltear el filete';
                     await sendRecipeStep(3, 3, true, 200);
-                    await sendRecipeProgressWithTimer(240, 240); // 4 minutos con timer automático
+                    await sendRecipeProgressWithTimer(240); // 4 minutos
                 }, 3000);
             }, 2000);
         }
@@ -725,19 +650,19 @@
             
             // Paso 1: Hervir agua con sal
             await sendRecipeStep(1, 3, false, 100);
-            await sendRecipeProgressWithTimer(480, 480); // 8 minutos con timer automático
+            await sendRecipeProgressWithTimer(480); // 8 minutos
             
             setTimeout(async () => {
                 // Paso 2: Añadir pasta - REQUIERE ACCIÓN
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendRecipeStep(2, 3, true, 100);
-                await sendRecipeProgressWithTimer(600, 600); // 10 minutos con timer automático
+                await sendRecipeProgressWithTimer(600); // 10 minutos
                 
                 setTimeout(async () => {
                     // Paso 3: Escurrir pasta - REQUIERE ACCIÓN
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendRecipeStep(3, 3, true, 0);
-                    await sendRecipeProgressWithTimer(60, 60); // 1 minuto con timer automático
+                    await sendRecipeProgressWithTimer(60); // 1 minuto
                 }, 3000);
             }, 2000);
         }
@@ -767,15 +692,13 @@
         function showVersionInfo() {
             const versionDetails = `
 SmartCookware Web App
-Versión: 2.3.0
-Build: 20241212-003
+Versión: 2.4.0
+Build: 20241212-004
 Fecha: ${new Date().toLocaleDateString()}
 
-Nuevas características v2.3.0:
-✓ Contador automático de tiempo
-✓ Actualización en tiempo real del progreso
-✓ Mejoras en la estabilidad de conexión
-✓ Nuevas recetas detalladas
+Nuevas características v2.4.0:
+✓ UI simplificada para envío de tiempo
+✓ Inicio automático de timer desde tiempo total
 
 Características incluidas:
 ✓ Conexión BLE con SmartCookware
@@ -796,11 +719,12 @@ Compatibilidad:
         
         // Mostrar versión en la consola al cargar - ACTUALIZADO
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.3.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-003');
+            console.log('%c SmartCookware Web App v2.4.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-004');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Automatic countdown timer, Real-time progress updates');
+            console.log('New features: Simplified timer UI, automatic start from total time');
         });
     </script>
 </body>
 </html>
+        
