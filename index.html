@@ -120,7 +120,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.4.0 - Build 20241212-004</div>
+    <div class="version-info">Versión 2.5.0 - Build 20241212-005</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -222,7 +222,7 @@
     <script>
         // Mostrar información de versión en la consola para debug
         console.log('SmartCookware Web App - Versión 2.5.0');
-        console.log('Build: 20241212-004');
+        console.log('Build: 20241212-005');
         console.log('Características: UI simplificada para tiempo, inicio automático desde tiempo total');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
@@ -280,7 +280,7 @@
         async function connectToDevice() {
             try {
                 statusText.textContent = 'Buscando dispositivos...';
-                console.log('Intentando conectar... (v2.2.0)');
+                console.log('Intentando conectar... (v2.5.0)');
                 
                 // Cambiamos a especificar directamente todos los servicios
                 // sin hacer referencia a las variables constantes
@@ -345,7 +345,7 @@
                 
                 // Debug para verificar que se muestran los controles
                 console.log('Controles mostrados:', !controlsCard.classList.contains('hidden'));
-                console.log('Versión de la app:', '2.2.0');
+                console.log('Versión de la app:', '2.5.0');
                 
             } catch (error) {
                 console.error('Error al conectar:', error);
@@ -746,11 +746,11 @@
         function showVersionInfo() {
             const versionDetails = `
 SmartCookware Web App
-Versión: 2.4.0
-Build: 20241212-004
+Versión: 2.5.0
+Build: 20241212-005
 Fecha: ${new Date().toLocaleDateString()}
 
-Nuevas características v2.4.0:
+Nuevas características v2.5.0:
 ✓ UI simplificada para envío de tiempo
 ✓ Inicio automático de timer desde tiempo total
 
@@ -773,8 +773,8 @@ Compatibilidad:
         
         // Mostrar versión en la consola al cargar - ACTUALIZADO
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.4.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-004');
+            console.log('%c SmartCookware Web App v2.5.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-005');
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Simplified timer UI, automatic start from total time');
         });
@@ -868,15 +868,13 @@ Compatibilidad:
                 alert('Característica de continuar no disponible');
                 return;
             }
-            
             try {
                 // Simular que se requiere una acción
                 await sendRecipeStep(1, 1, true, 150);
                 
                 setTimeout(() => {
-                    statusText.textContent = 'Test: Mostrando acción requerida (v2.4.0)';
+                    statusText.textContent = 'Test: Mostrando acción requerida (v2.5.0)';
                 }, 1000);
-                
             } catch (error) {
                 console.error('Error en test:', error);
                 statusText.textContent = 'Error en test: ' + error.message;
