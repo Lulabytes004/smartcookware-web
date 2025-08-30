@@ -882,7 +882,7 @@ Compatibilidad:
             }
         }
         
-        // Nueva función para acelerar al siguiente paso
+        // Nueva función para acelerar al siguiente paso - CORREGIDA
         async function nextStep() {
             if (!device || !device.gatt.connected) {
                 alert('Dispositivo no conectado');
@@ -894,14 +894,17 @@ Compatibilidad:
                 return;
             }
             
-            // Acelerar el paso actual fijando el tiempo restante a 3 segundos
-            currentRemainingTime = 3;
+            // Acelerar el paso actual fijando el tiempo restante a 5 segundos
+            currentRemainingTime = 5;
             
-            // Enviar la actualización inmediatamente al periférico
+            // Actualizar UI local inmediatamente
+            updateTimeDisplay(currentRemainingTime, currentTotalTime);
+            
+            // Enviar la actualización al periférico
             try {
                 await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
-                statusText.textContent = '⏩ Acelerando al siguiente paso... (3 segundos)';
-                console.log('⏩ Paso acelerado: tiempo restante fijado a 3 segundos');
+                statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
+                console.log('⏩ Paso acelerado: tiempo restante fijado a 5 segundos');
             } catch (error) {
                 console.error('Error al acelerar paso:', error);
                 statusText.textContent = 'Error al acelerar paso: ' + error.message;
