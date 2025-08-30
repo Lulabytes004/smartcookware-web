@@ -221,7 +221,7 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.4.0');
+        console.log('SmartCookware Web App - Versión 2.5.0');
         console.log('Build: 20241212-004');
         console.log('Características: UI simplificada para tiempo, inicio automático desde tiempo total');
         
@@ -640,31 +640,85 @@
             }, 2000);
         }
         
+        // Helper: inicia el timer con callback al finalizar (sin usar setTimeout externos)
+        function startAutomaticTimerWithCallback(remainingTime, totalTime, callback) {
+            // Detener cualquier timer anterior
+            stopAutomaticTimer();
+
+            currentRemainingTime = remainingTime;
+            currentTotalTime = totalTime;
+            isTimerActive = true;
+
+            // Refrescar UI inmediata
+            updateTimeDisplay(currentRemainingTime, currentTotalTime);
+
+            // Intervalo de 1s con envío al periférico
+            timerInterval = setInterval(async () => {
+                if (!isTimerActive || !device || !device.gatt.connected) {
+                    stopAutomaticTimer();
+                    return;
+                }
+
+                currentRemainingTime--;
+
+                if (currentRemainingTime <= 0) {
+                    currentRemainingTime = 0;
+                    updateTimeDisplay(0, currentTotalTime);
+
+                    // Última actualización al periférico a 0
+                    try { await sendRecipeProgressUpdate(0, currentTotalTime); } catch (e) {}
+
+                    stopAutomaticTimer();
+
+                    // Lanzar siguiente paso tras finalizar el countdown
+                    if (typeof callback === 'function') {
+                        setTimeout(callback, 200);
+                    }
+                    return;
+                }
+
+                // Actualización de UI + periférico en cada tick
+                updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                try {
+                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                } catch (error) {
+                    console.error('Error enviando actualización de tiempo:', error);
+                    stopAutomaticTimer();
+                }
+            }, 1000);
+        }
+
+        // Helper: envía remaining=total y espera a que termine para ejecutar el callback
+        async function sendRecipeProgressAndWait(totalTime, nextStepCallback) {
+            const remaining = totalTime;
+            await sendRecipeProgress(remaining, totalTime);
+            startAutomaticTimerWithCallback(remaining, totalTime, nextStepCallback);
+        }
+
+        // Ajuste: Receta de Pasta sin setTimeout; avanza solo al terminar cada countdown
         async function startPastaRecipe() {
             if (!device || !device.gatt.connected) {
                 alert('Dispositivo no conectado');
                 return;
             }
-            
+
             statusText.textContent = '🍝 Iniciando Pasta Italiana...';
-            
-            // Paso 1: Hervir agua con sal
+
+            // Paso 1: Hervir agua
             await sendRecipeStep(1, 3, false, 100);
-            await sendRecipeProgressWithTimer(480); // 8 minutos
-            
-            setTimeout(async () => {
-                // Paso 2: Añadir pasta - REQUIERE ACCIÓN
+            await sendRecipeProgressAndWait(480, async () => {
+                // Paso 2: Añadir pasta - requiere acción
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendRecipeStep(2, 3, true, 100);
-                await sendRecipeProgressWithTimer(600); // 10 minutos
-                
-                setTimeout(async () => {
-                    // Paso 3: Escurrir pasta - REQUIERE ACCIÓN
+                await sendRecipeProgressAndWait(600, async () => {
+                    // Paso 3: Escurrir pasta - requiere acción
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendRecipeStep(3, 3, true, 0);
-                    await sendRecipeProgressWithTimer(60); // 1 minuto
-                }, 3000);
-            }, 2000);
+                    await sendRecipeProgressAndWait(60, () => {
+                        statusText.textContent = '🍝 ¡Pasta Italiana completada!';
+                    });
+                });
+            });
         }
         
         async function resetRecipe() {
