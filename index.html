@@ -655,6 +655,7 @@
         
         async function sendRecipeProgressAndWait(totalTime, nextStepCallback) {
             const remaining = totalTime;
+            console.log(`📤 Enviando progreso y esperando: ${totalTime}s`);
             await sendRecipeProgress(remaining, totalTime);
             startAutomaticTimerWithCallback(remaining, totalTime, nextStepCallback);
         }
@@ -741,19 +742,23 @@
             currentTotalTime = totalTime;
             isTimerActive = true;
 
+            console.log(`🚀 Iniciando timer con callback: ${remainingTime}s de ${totalTime}s`);
             updateTimeDisplay(currentRemainingTime, currentTotalTime);
 
             timerInterval = setInterval(async () => {
                 if (!isTimerActive || !device || !device.gatt.connected) {
+                    console.log('⏹️ Timer detenido - dispositivo desconectado o timer inactivo');
                     stopAutomaticTimer();
                     return;
                 }
 
                 currentRemainingTime--;
+                console.log(`⏰ Timer: ${currentRemainingTime}s restantes`);
 
                 if (currentRemainingTime <= 0) {
                     currentRemainingTime = 0;
                     updateTimeDisplay(0, currentTotalTime);
+                    console.log('✅ Timer completado - ejecutando callback');
 
                     try { await sendRecipeProgressUpdate(0, currentTotalTime); } catch (e) {}
 
@@ -773,6 +778,15 @@
                     stopAutomaticTimer();
                 }
             }, 1000);
+        }
+        
+        function stopAutomaticTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                isTimerActive = false;
+                console.log('⏹️ Timer detenido');
+            }
         }
         
         async function sendRecipeProgressUpdate(remainingTime, totalTime) {
