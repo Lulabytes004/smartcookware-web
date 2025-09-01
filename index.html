@@ -734,12 +734,45 @@
             }, 1000);
         }
         
-        function stopAutomaticTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                isTimerActive = false;
-            }
+        function startAutomaticTimerWithCallback(remainingTime, totalTime, callback) {
+            stopAutomaticTimer();
+
+            currentRemainingTime = remainingTime;
+            currentTotalTime = totalTime;
+            isTimerActive = true;
+
+            updateTimeDisplay(currentRemainingTime, currentTotalTime);
+
+            timerInterval = setInterval(async () => {
+                if (!isTimerActive || !device || !device.gatt.connected) {
+                    stopAutomaticTimer();
+                    return;
+                }
+
+                currentRemainingTime--;
+
+                if (currentRemainingTime <= 0) {
+                    currentRemainingTime = 0;
+                    updateTimeDisplay(0, currentTotalTime);
+
+                    try { await sendRecipeProgressUpdate(0, currentTotalTime); } catch (e) {}
+
+                    stopAutomaticTimer();
+
+                    if (typeof callback === 'function') {
+                        setTimeout(callback, 200);
+                    }
+                    return;
+                }
+
+                updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                try {
+                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                } catch (error) {
+                    console.error('Error enviando actualización de tiempo:', error);
+                    stopAutomaticTimer();
+                }
+            }, 1000);
         }
         
         async function sendRecipeProgressUpdate(remainingTime, totalTime) {
