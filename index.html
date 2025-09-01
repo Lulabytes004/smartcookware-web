@@ -273,6 +273,15 @@
             <button class="button-small" onclick="sendRecipeProgressManual()" style="width: 100%; margin-top: 10px;">⏰ Iniciar Timer del Paso</button>
         </div>
 
+        <!-- Controles de utilidad -->
+        <div class="input-group">
+            <label>Controles de Utilidad:</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <button class="utility-button" onclick="resetRecipe()">🔄 Reset Receta</button>
+                <button class="utility-button" onclick="nextStep()">⏩ Siguiente Paso</button>
+            </div>
+        </div>
+
         <button class="advanced-toggle" onclick="toggleAdvancedMode()">🔙 Volver al Modo Simple</button>
     </div>
 
