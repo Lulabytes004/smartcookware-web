@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.0 - Build 20241212-007</div>
+    <div class="version-info">Versión 2.7.1 - Build 20241212-008</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -287,9 +287,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.0');
-        console.log('Build: 20241212-007');
-        console.log('Características: Corregido timing en receta Filete a la Plancha');
+        console.log('SmartCookware Web App - Versión 2.7.1');
+        console.log('Build: 20241212-008');
+        console.log('Características: Ocultar progreso de receta en modos Hervir/Freír');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -845,10 +845,10 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-007');
+            console.log('%c SmartCookware Web App v2.7.1 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-008');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Fixed timing issue in Steak recipe using callback system');
+            console.log('New features: Hide recipe progress section for Boil/Fry modes');
         });
     </script>
 </body>
