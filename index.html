@@ -116,6 +116,59 @@
             margin-bottom: 20px;
             font-style: italic;
         }
+
+        /* Nuevos estilos para el diseño simplificado */
+        .recipe-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .recipe-buttons button {
+            margin: 0;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        .single-button {
+            grid-column: 1 / -1;
+        }
+
+        .preset-button {
+            background-color: #2196F3;
+        }
+
+        .preset-button:hover {
+            background-color: #1976D2;
+        }
+
+        .utility-button {
+            background-color: #FF9800;
+        }
+
+        .utility-button:hover {
+            background-color: #F57C00;
+        }
+
+        .advanced-toggle {
+            background-color: #9C27B0;
+            margin-top: 15px;
+        }
+
+        .advanced-toggle:hover {
+            background-color: #7B1FA2;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -153,11 +206,27 @@
         <button id="continueButton">CONTINUAR</button>
     </div>
 
-    <!-- Nueva sección para controles de envío -->
-    <div class="card hidden" id="controlsCard">
+    <!-- Sección de recetas simplificada -->
+    <div class="card hidden" id="recipeCard">
+        <h2>Recetas</h2>
+        
+        <div class="recipe-buttons">
+            <button class="preset-button" onclick="setPresetTemp(100)">Hervir</button>
+            <button class="preset-button" onclick="setPresetTemp(180)">Freír</button>
+            <button class="preset-button" onclick="startSteakRecipe()">Filete a la Plancha</button>
+            <button class="preset-button" onclick="startPastaRecipe()">Pasta Italiana</button>
+            <button class="utility-button" onclick="resetRecipe()">Reset Receta</button>
+            <button class="utility-button" onclick="nextStep()">Siguiente Paso</button>
+        </div>
+
+        <button class="advanced-toggle" onclick="toggleAdvancedMode()">🔧 Modo Avanzado</button>
+    </div>
+
+    <!-- Controles avanzados (ocultos por defecto) -->
+    <div class="card hidden" id="advancedCard">
         <h2>Controles de Receta</h2>
         
-        <!-- Control para enviar paso de receta - MEJORADO -->
+        <!-- Control para enviar paso de receta -->
         <div class="input-group">
             <label>Característica BLE: Steps (Configuración de Paso):</label>
             <div class="flex-container">
@@ -186,7 +255,7 @@
             <button class="button-small" onclick="sendRecipeStepManual()" style="width: 100%; margin-top: 10px;">📤 Enviar Configuración de Paso</button>
         </div>
         
-        <!-- Control para enviar progreso de tiempo - SIMPLIFICADO -->
+        <!-- Control para enviar progreso de tiempo -->
         <div class="input-group">
             <label>Característica BLE: Progress (Tiempo del Paso):</label>
             <div style="flex: 1; margin-bottom: 10px;">
@@ -203,28 +272,15 @@
             </div>
             <button class="button-small" onclick="sendRecipeProgressManual()" style="width: 100%; margin-top: 10px;">⏰ Iniciar Timer del Paso</button>
         </div>
-        
-        <!-- Recetas predefinidas -->
-        <div class="input-group">
-            <label>Recetas Predefinidas:</label>
-            <button class="button-small" onclick="startPaellaRecipe()">Paella Valenciana</button>
-            <button class="button-small" onclick="startSteakRecipe()">Filete a la Plancha</button>
-            <button class="button-small" onclick="startPastaRecipe()">Pasta Italiana</button>
-        </div>
-        
-        <!-- Control manual para reset -->
-        <div class="input-group">
-            <button class="button-small" onclick="resetRecipe()">Reset Receta</button>
-            <button class="button-small" onclick="nextStep()">Siguiente Paso</button>
-            <button class="button-small" onclick="testContinueNotification()">Test Continuar</button>
-        </div>
+
+        <button class="advanced-toggle" onclick="toggleAdvancedMode()">🔙 Volver al Modo Simple</button>
     </div>
 
     <script>
         // Mostrar información de versión en la consola para debug
         console.log('SmartCookware Web App - Versión 2.5.0');
         console.log('Build: 20241212-005');
-        console.log('Características: UI simplificada para tiempo, inicio automático desde tiempo total');
+        console.log('Características: Diseño simplificado con modo avanzado');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -238,7 +294,7 @@
         const STEPS_CHARACTERISTIC_UUID = 'abcd1234-0003-9012-3456-7890abcdef12';
         const CONTINUE_CHARACTERISTIC_UUID = 'abcd1234-0005-9012-3456-7890abcdef12';
         
-        // Variables para el contador de tiempo automático - AÑADIR ESTAS VARIABLES
+        // Variables para el contador de tiempo automático
         let timerInterval = null;
         let currentRemainingTime = 0;
         let currentTotalTime = 0;
@@ -251,6 +307,9 @@
         let progressCharacteristic = null;
         let stepsCharacteristic = null;
         let continueCharacteristic = null;
+        
+        // Estado del modo avanzado
+        let isAdvancedMode = false;
         
         // Elementos del DOM
         const connectButton = document.getElementById('connectButton');
@@ -266,7 +325,8 @@
         const progressBar = document.getElementById('progressBar');
         const actionRequiredCard = document.getElementById('actionRequiredCard');
         const continueButton = document.getElementById('continueButton');
-        const controlsCard = document.getElementById('controlsCard');
+        const recipeCard = document.getElementById('recipeCard');
+        const advancedCard = document.getElementById('advancedCard');
         
         // Eventos
         connectButton.addEventListener('click', connectToDevice);
@@ -278,59 +338,79 @@
             connectButton.disabled = true;
         }
         
+        // Función para alternar modo avanzado
+        function toggleAdvancedMode() {
+            isAdvancedMode = !isAdvancedMode;
+            
+            if (isAdvancedMode) {
+                recipeCard.classList.add('hidden');
+                advancedCard.classList.remove('hidden');
+            } else {
+                advancedCard.classList.add('hidden');
+                recipeCard.classList.remove('hidden');
+            }
+        }
+        
+        // Función para presets de temperatura simples
+        async function setPresetTemp(temperature) {
+            if (!device || !device.gatt.connected) {
+                alert('Dispositivo no conectado');
+                return;
+            }
+            
+            // Enviar configuración simple: paso 1/1, sin acción requerida, temperatura preset
+            await sendRecipeStep(1, 1, false, temperature);
+            
+            // Mostrar temperatura objetivo
+            tempSetpoint.textContent = `${temperature}°C`;
+            setpointContainer.classList.remove('hidden');
+            
+            let tempName = temperature === 100 ? 'Hervir' : 'Freír';
+            statusText.textContent = `🔥 Modo ${tempName} - ${temperature}°C`;
+        }
+
         async function connectToDevice() {
             try {
                 statusText.textContent = 'Buscando dispositivos...';
                 console.log('Intentando conectar... (v2.5.0)');
                 
-                // Cambiamos a especificar directamente todos los servicios
-                // sin hacer referencia a las variables constantes
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'SmartCookware' }],
                     optionalServices: [
-                        '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
-                        'abcd1234-5678-9012-3456-7890abcdef12'  // Cooking Service
+                        '0000180f-0000-1000-8000-00805f9b34fb',
+                        'abcd1234-5678-9012-3456-7890abcdef12'
                     ]
                 });
                 
                 statusText.textContent = 'Conectando...';
                 
-                // Conectar al dispositivo
                 const server = await device.gatt.connect();
-                
-                // Manejar desconexiones
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 
-                // Obtener servicio de batería - usando directamente el UUID
+                // Obtener servicio de batería
                 const batteryService = await server.getPrimaryService('0000180f-0000-1000-8000-00805f9b34fb');
                 batteryCharacteristic = await batteryService.getCharacteristic('00002a19-0000-1000-8000-00805f9b34fb');
                 
-                // Suscribirse a notificaciones de batería
                 await batteryCharacteristic.startNotifications();
                 batteryCharacteristic.addEventListener('characteristicvaluechanged', handleBatteryChange);
                 
-                // Leer nivel de batería inicial
                 const batteryValue = await batteryCharacteristic.readValue();
                 updateBatteryLevel(batteryValue);
                 
-                // Obtener servicio de cocina - usando directamente el UUID
+                // Obtener servicio de cocina
                 const cookingService = await server.getPrimaryService('abcd1234-5678-9012-3456-7890abcdef12');
                 
-                // Obtener características usando directamente los UUIDs
                 tempCharacteristic = await cookingService.getCharacteristic('abcd1234-0001-9012-3456-7890abcdef12');
                 progressCharacteristic = await cookingService.getCharacteristic('abcd1234-0002-9012-3456-7890abcdef12');
                 stepsCharacteristic = await cookingService.getCharacteristic('abcd1234-0003-9012-3456-7890abcdef12');
                 continueCharacteristic = await cookingService.getCharacteristic('abcd1234-0005-9012-3456-7890abcdef12');
                 
-                // Suscribirse a notificaciones de temperatura
                 await tempCharacteristic.startNotifications();
                 tempCharacteristic.addEventListener('characteristicvaluechanged', handleTemperatureChange);
                 
-                // Suscribirse a notificaciones de continuar
                 await continueCharacteristic.startNotifications();
                 continueCharacteristic.addEventListener('characteristicvaluechanged', handleContinueChange);
                 
-                // Leer temperatura inicial
                 const tempValue = await tempCharacteristic.readValue();
                 updateTemperature(tempValue);
                 
@@ -340,19 +420,15 @@
                 connectButton.removeEventListener('click', connectToDevice);
                 connectButton.addEventListener('click', disconnectDevice);
                 
-                // Mostrar tarjeta de temperatura y controles - CORREGIDO
+                // Mostrar tarjetas principales
                 temperatureCard.classList.remove('hidden');
-                controlsCard.classList.remove('hidden');
+                recipeCard.classList.remove('hidden');
                 
-                // Debug para verificar que se muestran los controles
-                console.log('Controles mostrados:', !controlsCard.classList.contains('hidden'));
-                console.log('Versión de la app:', '2.5.0');
+                console.log('Dispositivo conectado - Diseño simplificado activo');
                 
             } catch (error) {
                 console.error('Error al conectar:', error);
                 statusText.textContent = 'Error: ' + error.message;
-                // Mostrar más información de debug en la consola
-                console.log('Error detallado:', error);
                 alert('Error al conectar: ' + error.message);
             }
         }
@@ -374,7 +450,8 @@
             temperatureCard.classList.add('hidden');
             recipeProgressCard.classList.add('hidden');
             actionRequiredCard.classList.add('hidden');
-            controlsCard.classList.add('hidden');
+            recipeCard.classList.add('hidden');
+            advancedCard.classList.add('hidden');
             
             // Resetear variables
             device = null;
@@ -383,8 +460,8 @@
             progressCharacteristic = null;
             stepsCharacteristic = null;
             continueCharacteristic = null;
+            isAdvancedMode = false;
             
-            // Detener el timer automático al desconectar
             stopAutomaticTimer();
         }
         
@@ -402,15 +479,13 @@
         }
         
         function updateTemperature(value) {
-            // La temperatura es un uint16 (2 bytes)
-            const temp = value.getUint16(0, false); // false = big-endian
+            const temp = value.getUint16(0, false);
             currentTemp.textContent = `${temp}°C`;
         }
         
         function handleContinueChange(event) {
             const continueValue = event.target.value.getUint8(0);
             if (continueValue === 1) {
-                // La acción ya fue atendida en el dispositivo
                 actionRequiredCard.classList.add('hidden');
             }
         }
@@ -419,28 +494,21 @@
             if (!continueCharacteristic) return;
             
             try {
-                // Enviar señal de continuar (valor 1)
                 const value = new Uint8Array([1]);
                 await continueCharacteristic.writeValue(value);
-                
-                // Ocultar tarjeta de acción requerida
                 actionRequiredCard.classList.add('hidden');
-                
                 statusText.textContent = 'Acción completada';
             } catch (error) {
                 console.error('Error al enviar señal de continuar:', error);
                 statusText.textContent = 'Error: ' + error.message;
             }
         }
-        
-        // Funciones para enviar datos al dispositivo
-        
+
+        // ...existing code... (resto de funciones sin cambios)
         async function sendRecipeStep(step, totalSteps, actionRequired, tempTarget) {
             if (!stepsCharacteristic) return;
             
             try {
-                // Crear array de 5 bytes:
-                // [paso actual, total pasos, acción requerida, tempTarget MSB, tempTarget LSB]
                 const data = new Uint8Array([
                     step, 
                     totalSteps,
@@ -451,7 +519,6 @@
                 
                 await stepsCharacteristic.writeValue(data);
                 
-                // Actualizar UI según los valores enviados
                 stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
                 recipeProgressCard.classList.remove('hidden');
                 
@@ -474,8 +541,6 @@
             if (!progressCharacteristic) return;
             
             try {
-                // Crear array de 4 bytes:
-                // [remainingTime MSB, remainingTime LSB, totalTime MSB, totalTime LSB]
                 const data = new Uint8Array([
                     (remainingTime >> 8) & 0xFF,
                     remainingTime & 0xFF,
@@ -484,8 +549,6 @@
                 ]);
                 
                 await progressCharacteristic.writeValue(data);
-                
-                // Actualizar UI
                 updateTimeDisplay(remainingTime, totalTime);
                 
             } catch (error) {
@@ -494,15 +557,12 @@
         }
         
         function updateTimeDisplay(remainingTime, totalTime) {
-            // Calcular minutos y segundos
             const minutes = Math.floor(remainingTime / 60);
             const seconds = remainingTime % 60;
             
-            // Formatear tiempo (mm:ss)
             const timeStr = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
             timeRemaining.textContent = timeStr;
             
-            // Actualizar barra de progreso
             let progress = 0;
             if (totalTime > 0) {
                 progress = Math.floor(100 * (1 - remainingTime / totalTime));
@@ -510,8 +570,6 @@
             progressBar.style.width = `${progress}%`;
             progressBar.textContent = `${progress}%`;
         }
-        
-        // Nuevas funciones para controles manuales
         
         async function sendRecipeStepManual() {
             if (!stepsCharacteristic) {
@@ -525,14 +583,14 @@
             const actionReq = parseInt(document.getElementById('actionRequired').value);
             
             if (isNaN(step) || isNaN(totalSteps) || isNaN(tempSetpoint) || step < 0 || totalSteps < 0 || tempSetpoint < 0) {
-                alert('Por favor, completa todos los campos con valores válidos:\n- Paso: 0-10\n- Total Pasos: 0-10\n- Temperatura: 0-300°C');
+                alert('Por favor, completa todos los campos con valores válidos');
                 return;
             }
             
             console.log(`📋 Steps BLE - Paso: ${step}/${totalSteps}, Setpoint: ${tempSetpoint}°C, Acción: ${actionReq ? 'Requerida' : 'No requerida'}`);
             
             await sendRecipeStep(step, totalSteps, actionReq === 1, tempSetpoint);
-            statusText.textContent = `✅ Steps enviado: Paso ${step}/${totalSteps}, ${tempSetpoint}°C, ${actionReq ? 'Con acción' : 'Sin acción'}`;
+            statusText.textContent = `✅ Steps enviado: Paso ${step}/${totalSteps}, ${tempSetpoint}°C`;
         }
         
         async function sendRecipeProgressManual() {
@@ -544,74 +602,24 @@
             const totalStepTime = parseInt(document.getElementById('totalTimeInput').value);
             
             if (isNaN(totalStepTime) || totalStepTime <= 0) {
-                alert('Tiempo inválido. Verificar:\n- Tiempo Total del Paso: 1-7200 seg (1 seg a 2 horas)');
+                alert('Tiempo inválido. Debe ser entre 1-7200 segundos');
                 return;
             }
             
-            // Inicializar remaining time igual al total time
             const remainingTime = totalStepTime;
             
-            // Convertir a formato mm:ss para mostrar
-            const totalMin = Math.floor(totalStepTime / 60);
-            const totalSec = totalStepTime % 60;
+            console.log(`⏱️ Progress BLE - Iniciando timer: ${totalStepTime}s`);
             
-            console.log(`⏱️ Progress BLE - Iniciando timer: ${totalStepTime}s (${totalMin}:${totalSec.toString().padStart(2,'0')}) - Remaining = Total al inicio`);
-            
-            // Enviar el tiempo inicial (ambos valores iguales)
             await sendRecipeProgress(remainingTime, totalStepTime);
-            
-            // Iniciar el contador automático
             startAutomaticTimer(remainingTime, totalStepTime);
             
-            statusText.textContent = `⏱️ Timer iniciado: ${totalMin}:${totalSec.toString().padStart(2,'0')} (Countdown automático activado)`;
+            statusText.textContent = `⏱️ Timer iniciado: ${Math.floor(totalStepTime/60)}:${(totalStepTime%60).toString().padStart(2,'0')}`;
         }
         
-        // Función mejorada para las recetas con timer automático
         async function sendRecipeProgressWithTimer(totalTime) {
-            // Simplificar: remaining time = total time al inicio
             const remainingTime = totalTime;
-            
-            // Enviar el tiempo inicial
             await sendRecipeProgress(remainingTime, totalTime);
-            
-            // Iniciar contador automático
             startAutomaticTimer(remainingTime, totalTime);
-        }
-        
-        // Actualizar las recetas para usar la nueva función simplificada
-        
-        async function startPaellaRecipe() {
-            if (!device || !device.gatt.connected) {
-                alert('Dispositivo no conectado');
-                return;
-            }
-            
-            statusText.textContent = '🥘 Iniciando Paella Valenciana...';
-            
-            // Paso 1: Calentar aceite de oliva
-            await sendRecipeStep(1, 4, false, 180);
-            await sendRecipeProgressWithTimer(300); // 5 minutos
-            
-            setTimeout(async () => {
-                // Paso 2: Sofreír pollo y verduras - REQUIERE ACCIÓN
-                statusText.textContent = '🥘 Añadir pollo y verduras';
-                await sendRecipeStep(2, 4, true, 160);
-                await sendRecipeProgressWithTimer(600); // 10 minutos
-                
-                setTimeout(async () => {
-                    // Paso 3: Añadir arroz y caldo
-                    statusText.textContent = '🥘 Añadir arroz y caldo';
-                    await sendRecipeStep(3, 4, true, 100);
-                    await sendRecipeProgressWithTimer(1200); // 20 minutos
-                    
-                    setTimeout(async () => {
-                        // Paso 4: Socarrat final
-                        statusText.textContent = '🥘 Socarrat final';
-                        await sendRecipeStep(4, 4, false, 200);
-                        await sendRecipeProgressWithTimer(300); // 5 minutos
-                    }, 3000);
-                }, 3000);
-            }, 2000);
         }
         
         async function startSteakRecipe() {
@@ -622,38 +630,31 @@
             
             statusText.textContent = '🥩 Iniciando Filete a la Plancha...';
             
-            // Paso 1: Precalentar sartén bien caliente
             await sendRecipeStep(1, 3, false, 240);
-            await sendRecipeProgressWithTimer(240); // 4 minutos
+            await sendRecipeProgressWithTimer(240);
             
             setTimeout(async () => {
-                // Paso 2: Añadir filete - REQUIERE ACCIÓN
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendRecipeStep(2, 3, true, 220);
-                await sendRecipeProgressWithTimer(300); // 5 minutos
+                await sendRecipeProgressWithTimer(300);
                 
                 setTimeout(async () => {
-                    // Paso 3: Voltear filete - REQUIERE ACCIÓN
                     statusText.textContent = '🥩 Voltear el filete';
                     await sendRecipeStep(3, 3, true, 200);
-                    await sendRecipeProgressWithTimer(240); // 4 minutos
+                    await sendRecipeProgressWithTimer(240);
                 }, 3000);
             }, 2000);
         }
         
-        // Helper: inicia el timer con callback al finalizar (sin usar setTimeout externos)
         function startAutomaticTimerWithCallback(remainingTime, totalTime, callback) {
-            // Detener cualquier timer anterior
             stopAutomaticTimer();
 
             currentRemainingTime = remainingTime;
             currentTotalTime = totalTime;
             isTimerActive = true;
 
-            // Refrescar UI inmediata
             updateTimeDisplay(currentRemainingTime, currentTotalTime);
 
-            // Intervalo de 1s con envío al periférico
             timerInterval = setInterval(async () => {
                 if (!isTimerActive || !device || !device.gatt.connected) {
                     stopAutomaticTimer();
@@ -666,19 +667,16 @@
                     currentRemainingTime = 0;
                     updateTimeDisplay(0, currentTotalTime);
 
-                    // Última actualización al periférico a 0
                     try { await sendRecipeProgressUpdate(0, currentTotalTime); } catch (e) {}
 
                     stopAutomaticTimer();
 
-                    // Lanzar siguiente paso tras finalizar el countdown
                     if (typeof callback === 'function') {
                         setTimeout(callback, 200);
                     }
                     return;
                 }
 
-                // Actualización de UI + periférico en cada tick
                 updateTimeDisplay(currentRemainingTime, currentTotalTime);
                 try {
                     await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
@@ -689,14 +687,12 @@
             }, 1000);
         }
 
-        // Helper: envía remaining=total y espera a que termine para ejecutar el callback
         async function sendRecipeProgressAndWait(totalTime, nextStepCallback) {
             const remaining = totalTime;
             await sendRecipeProgress(remaining, totalTime);
             startAutomaticTimerWithCallback(remaining, totalTime, nextStepCallback);
         }
 
-        // Ajuste: Receta de Pasta sin setTimeout; avanza solo al terminar cada countdown
         async function startPastaRecipe() {
             if (!device || !device.gatt.connected) {
                 alert('Dispositivo no conectado');
@@ -705,14 +701,11 @@
 
             statusText.textContent = '🍝 Iniciando Pasta Italiana...';
 
-            // Paso 1: Hervir agua
             await sendRecipeStep(1, 3, false, 100);
             await sendRecipeProgressAndWait(480, async () => {
-                // Paso 2: Añadir pasta - requiere acción
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendRecipeStep(2, 3, true, 100);
                 await sendRecipeProgressAndWait(600, async () => {
-                    // Paso 3: Escurrir pasta - requiere acción
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendRecipeStep(3, 3, true, 0);
                     await sendRecipeProgressAndWait(60, () => {
@@ -728,122 +721,65 @@
                 return;
             }
             
-            // Detener el timer automático
             stopAutomaticTimer();
             
-            // Enviar paso 0 para resetear
             await sendRecipeStep(0, 0, false, 0);
             await sendRecipeProgress(0, 0);
             
-            // Ocultar tarjetas de progreso y acción
             recipeProgressCard.classList.add('hidden');
             actionRequiredCard.classList.add('hidden');
             setpointContainer.classList.add('hidden');
             
-            statusText.textContent = 'Receta reseteada (Timer detenido)';
+            statusText.textContent = 'Receta reseteada';
         }
         
-        // Añadir función para mostrar información de versión - ACTUALIZADA
-        function showVersionInfo() {
-            const versionDetails = `
-SmartCookware Web App
-Versión: 2.5.0
-Build: 20241212-005
-Fecha: ${new Date().toLocaleDateString()}
-
-Nuevas características v2.5.0:
-✓ UI simplificada para envío de tiempo
-✓ Inicio automático de timer desde tiempo total
-
-Características incluidas:
-✓ Conexión BLE con SmartCookware
-✓ Monitoreo de temperatura en tiempo real
-✓ Monitoreo de batería
-✓ Controles manuales de receta
-✓ Recetas predefinidas (Paella, Filete, Pasta)
-✓ Sistema de acciones requeridas
-
-Compatibilidad:
-• Chrome para Android
-• Chrome para Desktop
-• Microsoft Edge (versiones recientes)
-            `;
-            
-            alert(versionDetails);
-        }
-        
-        // Mostrar versión en la consola al cargar - ACTUALIZADO
-        window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.5.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-005');
-            console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Simplified timer UI, automatic start from total time');
-        });
-        
-        // Función para iniciar el contador automático
         function startAutomaticTimer(remainingTime, totalTime) {
-            // Detener cualquier timer anterior
             stopAutomaticTimer();
             
             currentRemainingTime = remainingTime;
             currentTotalTime = totalTime;
             isTimerActive = true;
             
-            console.log(` Iniciando contador automático: ${remainingTime}s de ${totalTime}s`);
-            
-            // Actualizar UI inmediatamente
             updateTimeDisplay(currentRemainingTime, currentTotalTime);
             
-            // Iniciar intervalo de 1 segundo
             timerInterval = setInterval(async () => {
                 if (!isTimerActive || !device || !device.gatt.connected) {
                     stopAutomaticTimer();
                     return;
                 }
                 
-                // Decrementar tiempo
                 currentRemainingTime--;
                 
-                // Verificar si el tiempo se agotó
                 if (currentRemainingTime <= 0) {
                     currentRemainingTime = 0;
-                    console.log(' Tiempo agotado!');
                     statusText.textContent = '¡Tiempo del paso completado!';
                     stopAutomaticTimer();
                 }
                 
-                // Actualizar UI local
                 updateTimeDisplay(currentRemainingTime, currentTotalTime);
                 
-                // Enviar actualización al periférico
                 try {
                     await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
                 } catch (error) {
                     console.error('Error enviando actualización de tiempo:', error);
-                    // Si hay error de comunicación, detener el timer
                     stopAutomaticTimer();
                 }
                 
-            }, 1000); // Cada 1000ms = 1 segundo
+            }, 1000);
         }
         
-        // Función para detener el contador automático
         function stopAutomaticTimer() {
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
                 isTimerActive = false;
-                console.log(' Contador automático detenido');
             }
         }
         
-        // Función para enviar actualizaciones de tiempo (sin mostrar en UI)
         async function sendRecipeProgressUpdate(remainingTime, totalTime) {
             if (!progressCharacteristic) return;
             
             try {
-                // Crear array de 4 bytes:
-                // [remainingTime MSB, remainingTime LSB, totalTime MSB, totalTime LSB]
                 const data = new Uint8Array([
                     (remainingTime >> 8) & 0xFF,
                     remainingTime & 0xFF,
@@ -853,36 +789,16 @@ Compatibilidad:
                 
                 await progressCharacteristic.writeValue(data);
                 
-                // Solo log cada 10 segundos para no saturar la consola
                 if (remainingTime % 10 === 0 || remainingTime <= 5) {
-                    console.log(` Tiempo actualizado: ${remainingTime}s restantes de ${totalTime}s`);
+                    console.log(`⏱️ Tiempo actualizado: ${remainingTime}s restantes de ${totalTime}s`);
                 }
                 
             } catch (error) {
                 console.error('Error al enviar actualización de tiempo:', error);
-                throw error; // Re-lanzar para que el timer se detenga
+                throw error;
             }
         }
         
-        async function testContinueNotification() {
-            if (!continueCharacteristic) {
-                alert('Característica de continuar no disponible');
-                return;
-            }
-            try {
-                // Simular que se requiere una acción
-                await sendRecipeStep(1, 1, true, 150);
-                
-                setTimeout(() => {
-                    statusText.textContent = 'Test: Mostrando acción requerida (v2.5.0)';
-                }, 1000);
-            } catch (error) {
-                console.error('Error en test:', error);
-                statusText.textContent = 'Error en test: ' + error.message;
-            }
-        }
-        
-        // Nueva función para acelerar al siguiente paso - CORREGIDA
         async function nextStep() {
             if (!device || !device.gatt.connected) {
                 alert('Dispositivo no conectado');
@@ -894,22 +810,24 @@ Compatibilidad:
                 return;
             }
             
-            // Acelerar el paso actual fijando el tiempo restante a 5 segundos
             currentRemainingTime = 5;
-            
-            // Actualizar UI local inmediatamente
             updateTimeDisplay(currentRemainingTime, currentTotalTime);
             
-            // Enviar la actualización al periférico
             try {
                 await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
                 statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
-                console.log('⏩ Paso acelerado: tiempo restante fijado a 5 segundos');
             } catch (error) {
                 console.error('Error al acelerar paso:', error);
                 statusText.textContent = 'Error al acelerar paso: ' + error.message;
             }
         }
+        
+        window.addEventListener('load', () => {
+            console.log('%c SmartCookware Web App v2.5.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-005');
+            console.log('Loaded at:', new Date().toLocaleDateString());
+            console.log('New features: Simplified design with advanced mode toggle');
+        });
     </script>
 </body>
 </html>
