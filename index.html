@@ -522,7 +522,6 @@
             }
         }
 
-        // ...existing code... (resto de funciones sin cambios)
         async function sendRecipeStep(step, totalSteps, actionRequired, tempTarget) {
             if (!stepsCharacteristic) return;
             
@@ -538,7 +537,8 @@
                 await stepsCharacteristic.writeValue(data);
                 
                 stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
-                recipeProgressCard.classList.remove('hidden');
+                // NO mostrar automáticamente recipeProgressCard aquí
+                // recipeProgressCard.classList.remove('hidden');
                 
                 if (tempTarget > 0) {
                     tempSetpoint.textContent = `${tempTarget}°C`;
@@ -607,6 +607,9 @@
             
             console.log(`📋 Steps BLE - Paso: ${step}/${totalSteps}, Setpoint: ${tempSetpoint}°C, Acción: ${actionReq ? 'Requerida' : 'No requerida'}`);
             
+            // Para modo manual, mostrar la tarjeta de progreso
+            recipeProgressCard.classList.remove('hidden');
+            
             await sendRecipeStep(step, totalSteps, actionReq === 1, tempSetpoint);
             statusText.textContent = `✅ Steps enviado: Paso ${step}/${totalSteps}, ${tempSetpoint}°C`;
         }
@@ -648,6 +651,9 @@
             
             statusText.textContent = '🥩 Iniciando Filete a la Plancha...';
             
+            // Mostrar tarjeta de progreso para recetas complejas
+            recipeProgressCard.classList.remove('hidden');
+            
             await sendRecipeStep(1, 3, false, 240);
             await sendRecipeProgressAndWait(240, async () => {
                 statusText.textContent = '🥩 Colocar filete en la sartén';
@@ -676,6 +682,9 @@
             }
 
             statusText.textContent = '🍝 Iniciando Pasta Italiana...';
+
+            // Mostrar tarjeta de progreso para recetas complejas
+            recipeProgressCard.classList.remove('hidden');
 
             await sendRecipeStep(1, 3, false, 100);
             await sendRecipeProgressAndWait(480, async () => {
