@@ -367,21 +367,8 @@
                 return;
             }
             
-            // Detener cualquier timer activo y hacer reset completo
-            stopAutomaticTimer();
-            
-            // Primero hacer reset completo
-            await sendRecipeStep(0, 0, false, 0);
-            await sendRecipeProgress(0, 0);
-            
-            // Ocultar elementos no necesarios
-            actionRequiredCard.classList.add('hidden');
-            
-            // Luego configurar el modo específico: paso 1/1, sin acción requerida, temperatura preset
+            // Enviar configuración simple: paso 1/1, sin acción requerida, temperatura preset
             await sendRecipeStep(1, 1, false, temperature);
-            
-            // Enviar tiempo 0 para modos sin tiempo (Hervir/Freír)
-            await sendRecipeProgress(0, 0);
             
             // Mostrar temperatura objetivo
             tempSetpoint.textContent = `${temperature}°C`;
@@ -389,8 +376,6 @@
             
             let tempName = temperature === 100 ? 'Hervir' : 'Freír';
             statusText.textContent = `🔥 Modo ${tempName} - ${temperature}°C`;
-            
-            console.log(`🔥 Modo ${tempName} activado - Reset y configuración: Tiempo: 0s, Temperatura: ${temperature}°C`);
         }
 
         async function connectToDevice() {
