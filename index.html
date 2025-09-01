@@ -367,6 +367,13 @@
                 return;
             }
             
+            // Detener cualquier timer activo
+            stopAutomaticTimer();
+            
+            // Ocultar elementos no necesarios para modos simples
+            actionRequiredCard.classList.add('hidden');
+            recipeProgressCard.classList.add('hidden');
+            
             // Enviar configuración simple: paso 1/1, sin acción requerida, temperatura preset
             await sendRecipeStep(1, 1, false, temperature);
             
@@ -376,6 +383,8 @@
             
             let tempName = temperature === 100 ? 'Hervir' : 'Freír';
             statusText.textContent = `🔥 Modo ${tempName} - ${temperature}°C`;
+            
+            console.log(`🔥 Modo ${tempName} activado - Sin progreso de receta, solo temperatura: ${temperature}°C`);
         }
 
         async function connectToDevice() {
