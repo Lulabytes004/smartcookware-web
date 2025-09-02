@@ -310,6 +310,11 @@
         let currentTotalTime = 0;
         let isTimerActive = false;
         
+        // Variables para rastrear el paso actual de la receta
+        let currentStep = 0;
+        let totalSteps = 0;
+        let currentTempTarget = 0;
+        
         // Variables globales
         let device = null;
         let batteryCharacteristic = null;
@@ -608,20 +613,33 @@
         
         // Modificar para que replique exactamente lo que hace handleContinueChange
         async function sendContinueSignal() {
-            //if (!continueCharacteristic) return;
+            if (!continueCharacteristic) return;
             
-            //try {
+            try {
                 // 1. Enviar la señal al dispositivo
                 //const value = new Uint8Array([1]);
                 //await continueCharacteristic.writeValue(value);
                 
-                // 2. Realizar EXACTAMENTE la misma acción que se hace en handleContinueChange
+                // 2. Ocultar la tarjeta de acción requerida
                 actionRequiredCard.classList.add('hidden');
-            //     statusText.textContent = 'Acción completada';
-            // } catch (error) {
-            //     console.error('Error al enviar señal de continuar:', error);
-            //     statusText.textContent = 'Error: ' + error.message;
-            // }
+                
+                // 3. Reenviar el paso actual pero con actionRequired = 0
+                // Solo si tenemos información del paso actual
+                if (currentStep > 0 && window.totalSteps > 0) {
+                    console.log(`📤 Reenviando paso ${currentStep}/${window.totalSteps} con actionRequired=0`);
+                    try {
+                        // Reenviar el mismo paso pero con actionRequired = 0
+                        await sendRecipeStep(currentStep, window.totalSteps, false, currentTempTarget);
+                    } catch (error) {
+                        console.error('Error al reenviar paso sin acción requerida:', error);
+                    }
+                }
+                
+                statusText.textContent = 'Acción completada';
+            } catch (error) {
+                console.error('Error al enviar señal de continuar:', error);
+                statusText.textContent = 'Error: ' + error.message;
+            }
         }
 
         async function sendRecipeStep(step, totalSteps, actionRequired, tempTarget) {
@@ -637,6 +655,11 @@
                 ]);
                 
                 await stepsCharacteristic.writeValue(data);
+                
+                // Guardar la información del paso actual para posible uso posterior
+                currentStep = step;
+                currentTempTarget = tempTarget;
+                window.totalSteps = totalSteps;
                 
                 stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
                 // NO mostrar automáticamente recipeProgressCard aquí
@@ -1019,7 +1042,7 @@
             console.log('%c SmartCookware Web App v2.7.6 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Botón CONTINUAR emula exactamente comportamiento BLE');
+            console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida');
         });
         
         function updateBatteryLevel(value) {
