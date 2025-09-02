@@ -866,6 +866,26 @@
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Hide recipe progress section for Boil/Fry modes');
         });
+        
+        function updateBatteryLevel(value) {
+            // Verificar que tenemos al menos 1 byte antes de leer
+            if (value.byteLength >= 1) {
+                const batteryLevel = value.getUint8(0);
+                batteryText.textContent = `Batería: ${batteryLevel}%`;
+            } else {
+                console.error('Error: Datos de batería insuficientes, recibidos:', value.byteLength, 'bytes');
+            }
+        }
+        
+        function updateTemperature(value) {
+            // Verificar que tenemos al menos 2 bytes antes de leer uint16
+            if (value.byteLength >= 2) {
+                const temp = value.getUint16(0, false);
+                currentTemp.textContent = `${temp}°C`;
+            } else {
+                console.error('Error: Datos de temperatura insuficientes, recibidos:', value.byteLength, 'bytes, se esperaban 2');
+            }
+        }
     </script>
 </body>
 </html>
