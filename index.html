@@ -608,20 +608,20 @@
         
         // Modificar para que replique exactamente lo que hace handleContinueChange
         async function sendContinueSignal() {
-            if (!continueCharacteristic) return;
+            //if (!continueCharacteristic) return;
             
-            try {
+            //try {
                 // 1. Enviar la señal al dispositivo
-                const value = new Uint8Array([1]);
-                await continueCharacteristic.writeValue(value);
+                //const value = new Uint8Array([1]);
+                //await continueCharacteristic.writeValue(value);
                 
                 // 2. Realizar EXACTAMENTE la misma acción que se hace en handleContinueChange
                 actionRequiredCard.classList.add('hidden');
-                statusText.textContent = 'Acción completada';
-            } catch (error) {
-                console.error('Error al enviar señal de continuar:', error);
-                statusText.textContent = 'Error: ' + error.message;
-            }
+            //     statusText.textContent = 'Acción completada';
+            // } catch (error) {
+            //     console.error('Error al enviar señal de continuar:', error);
+            //     statusText.textContent = 'Error: ' + error.message;
+            // }
         }
 
         async function sendRecipeStep(step, totalSteps, actionRequired, tempTarget) {
