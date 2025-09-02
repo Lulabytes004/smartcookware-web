@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.5 - Build 20241212-010</div>
+    <div class="version-info">Versión 2.7.6 - Build 20241212-011</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -287,9 +287,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.5');
-        console.log('Build: 20241212-010');
-        console.log('Características: Mensaje de acción personalizado + Ocultar temperatura al finalizar');
+        console.log('SmartCookware Web App - Versión 2.7.6');
+        console.log('Build: 20241212-011');
+        console.log('Características: Avance automático al confirmar acción + Monitoreo de temperatura');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -605,14 +605,35 @@
             }
         }
         
+        // Función mejorada para enviar señal de continuar y avanzar al siguiente paso
         async function sendContinueSignal() {
             if (!continueCharacteristic) return;
             
             try {
+                // Enviar señal al dispositivo
                 const value = new Uint8Array([1]);
                 await continueCharacteristic.writeValue(value);
+                
+                // Ocultar la tarjeta de acción requerida
                 actionRequiredCard.classList.add('hidden');
-                statusText.textContent = 'Acción completada';
+                
+                // Nuevo: Avanzar automáticamente el timer para pasar al siguiente paso
+                if (isTimerActive) {
+                    console.log('✅ Acción confirmada - avanzando automáticamente al siguiente paso');
+                    statusText.textContent = '⏩ Avanzando al siguiente paso...';
+                    
+                    // Establecer el tiempo a 5 segundos para avanzar rápidamente
+                    currentRemainingTime = 5;
+                    updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                    
+                    try {
+                        await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                    } catch (error) {
+                        console.error('Error al acelerar paso después de acción:', error);
+                    }
+                } else {
+                    statusText.textContent = 'Acción completada';
+                }
             } catch (error) {
                 console.error('Error al enviar señal de continuar:', error);
                 statusText.textContent = 'Error: ' + error.message;
@@ -1011,10 +1032,10 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.5 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-010');
+            console.log('%c SmartCookware Web App v2.7.6 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Custom action messages + Hide temperature setpoint when recipe finishes');
+            console.log('New features: Auto-next on action + Temperature monitoring for first steps');
         });
         
         function updateBatteryLevel(value) {
