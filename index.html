@@ -286,10 +286,10 @@
     </div>
 
     <script>
-        // Mostrar información de versión en la consola para debug
+        // Actualizar información de versión en la consola
         console.log('SmartCookware Web App - Versión 2.7.6');
         console.log('Build: 20241212-011');
-        console.log('Características: Integración con botón CONTINUAR + Monitoreo de temperatura');
+        console.log('Características: Botón CONTINUAR equivalente a notificación BLE');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -571,6 +571,7 @@
             }
         }
         
+        // Función original que maneja la notificación BLE - solo oculta la tarjeta
         function handleContinueChange(event) {
             const value = event.target.value;
             // Verificar que tenemos al menos 1 byte antes de leer
@@ -578,21 +579,6 @@
                 const continueValue = value.getUint8(0);
                 if (continueValue === 1) {
                     actionRequiredCard.classList.add('hidden');
-                    
-                    // Si hay un timer activo, acelerar al siguiente paso
-                    if (isTimerActive && currentRemainingTime > 5) {
-                        console.log('✅ Botón físico presionado - acelerando al siguiente paso');
-                        currentRemainingTime = 5;
-                        updateTimeDisplay(currentRemainingTime, currentTotalTime);
-                        
-                        try {
-                            sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime)
-                                .then(() => statusText.textContent = '⏩ Avanzando al siguiente paso...')
-                                .catch(error => console.error('Error al acelerar paso:', error));
-                        } catch (error) {
-                            console.error('Error al acelerar paso:', error);
-                        }
-                    }
                 }
             } else {
                 console.error('Error: Datos de continue insuficientes, recibidos:', value.byteLength, 'bytes');
@@ -620,33 +606,18 @@
             }
         }
         
+        // Modificar para que replique exactamente lo que hace handleContinueChange
         async function sendContinueSignal() {
             if (!continueCharacteristic) return;
             
             try {
-                // 1. Enviar señal al dispositivo BLE
+                // 1. Enviar la señal al dispositivo
                 const value = new Uint8Array([1]);
                 await continueCharacteristic.writeValue(value);
                 
-                // 2. Simular exactamente el mismo comportamiento que en handleContinueChange
+                // 2. Realizar EXACTAMENTE la misma acción que se hace en handleContinueChange
                 actionRequiredCard.classList.add('hidden');
-                
-                // 3. Acelerar al siguiente paso si hay un timer activo
-                if (isTimerActive && currentRemainingTime > 5) {
-                    console.log('✅ Botón CONTINUAR pulsado - acelerando al siguiente paso');
-                    currentRemainingTime = 5;
-                    updateTimeDisplay(currentRemainingTime, currentTotalTime);
-                    
-                    try {
-                        await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
-                        statusText.textContent = '⏩ Avanzando al siguiente paso...';
-                    } catch (error) {
-                        console.error('Error al acelerar paso:', error);
-                        statusText.textContent = 'Error al acelerar paso: ' + error.message;
-                    }
-                } else {
-                    statusText.textContent = 'Acción completada';
-                }
+                statusText.textContent = 'Acción completada';
             } catch (error) {
                 console.error('Error al enviar señal de continuar:', error);
                 statusText.textContent = 'Error: ' + error.message;
@@ -1048,7 +1019,7 @@
             console.log('%c SmartCookware Web App v2.7.6 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Integración botón CONTINUAR con timer + Temperature monitoring');
+            console.log('New features: Botón CONTINUAR emula exactamente comportamiento BLE');
         });
         
         function updateBatteryLevel(value) {
