@@ -543,6 +543,9 @@
                 if (tempTarget > 0) {
                     tempSetpoint.textContent = `${tempTarget}°C`;
                     setpointContainer.classList.remove('hidden');
+                } else {
+                    // Si temperatura es 0, ocultar el contenedor de temperatura objetivo
+                    setpointContainer.classList.add('hidden');
                 }
                 
                 if (actionRequired) {
