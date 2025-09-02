@@ -763,24 +763,27 @@
         function startTemperatureMonitoringWithCallback(targetTemp, timeoutSeconds, callback) {
             // Detener cualquier timer activo
             stopAutomaticTimer();
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
-            }
+            stopTemperatureMonitoring(); // Asegurarse de limpiar monitoreo previo
             
             isWaitingForTemperature = true;
             targetTemperature = targetTemp;
             
-            console.log(`🌡️ Monitoreo: objetivo ${targetTemp}°C o timeout ${timeoutSeconds}s (lo primero que ocurra)`);
+            console.log(`🌡️ INICIANDO Monitoreo: objetivo ${targetTemp}°C o timeout ${timeoutSeconds}s`);
             
-            // Enviar progreso inicial igual que en sendRecipeProgressAndWait
-            sendRecipeProgress(timeoutSeconds, timeoutSeconds);
-            updateTimeDisplay(timeoutSeconds, timeoutSeconds);
+            // CORREGIR: Asegurarnos que se muestra el tiempo inicial
+            recipeProgressCard.classList.remove('hidden'); // Mostrar tarjeta de progreso
+            updateTimeDisplay(timeoutSeconds, timeoutSeconds); // Actualizar display primero
+            
+            // Ahora enviar la información al dispositivo
+            sendRecipeProgress(timeoutSeconds, timeoutSeconds)
+                .then(() => console.log('✅ Progreso inicial enviado correctamente'))
+                .catch(e => console.error('❌ Error enviando progreso inicial:', e));
             
             let remainingTime = timeoutSeconds;
             
             temperatureCheckInterval = setInterval(async () => {
                 if (!isWaitingForTemperature || !device || !device.gatt.connected) {
+                    console.log('❌ Monitoreo cancelado - dispositivo desconectado o monitoreo inactivo');
                     stopTemperatureMonitoring();
                     return;
                 }
@@ -788,56 +791,161 @@
                 const currentTempText = currentTemp.textContent;
                 const currentTempValue = parseInt(currentTempText.replace('°C', ''));
                 
+                // LOGS ADICIONALES para debugging
+                if (remainingTime % 10 === 0) {
+                    console.log(`🌡️ Temperatura actual: ${currentTempValue}°C (objetivo: ${targetTemp}°C)`);
+                    console.log(`⏱️ Tiempo restante: ${remainingTime}s de ${timeoutSeconds}s`);
+                }
+                
                 // Condición 1: Temperatura alcanzada
                 if (currentTempValue >= (targetTemp - 2)) {
-                    console.log(`✅ Temperatura alcanzada: ${currentTempValue}°C >= ${targetTemp}°C`);
+                    console.log(`✅ TEMPERATURA ALCANZADA: ${currentTempValue}°C >= ${targetTemp}°C`);
+                    
+                    try {
+                        await sendRecipeProgressUpdate(0, timeoutSeconds);
+                    } catch (e) {
+                        console.error('Error enviando progreso final:', e);
+                    }
+                    
+                    // Detener monitoreo ANTES de ejecutar callback
                     stopTemperatureMonitoring();
                     
-                    // Reportar 0 segundos restantes como en sendRecipeProgressAndWait
-                    await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    
-                    // Ejecutar el callback como en 2.7.4
+                    // Ejecutar callback
                     if (typeof callback === 'function') {
-                        setTimeout(callback, 200); // Mismo delay que en 2.7.4
+                        console.log('🚀 Ejecutando callback por temperatura alcanzada');
+                        setTimeout(callback, 200);
                     }
                     return;
                 }
                 
-                // Condición 2: Tiempo agotado (igual que en sendRecipeProgressAndWait)
+                // Condición 2: Tiempo agotado
                 remainingTime--;
                 
                 if (remainingTime <= 0) {
-                    console.log(`⏰ Timeout alcanzado: ${timeoutSeconds}s transcurridos`);
+                    console.log(`⏰ TIMEOUT ALCANZADO: ${timeoutSeconds}s transcurridos`);
+                    
+                    try {
+                        await sendRecipeProgressUpdate(0, timeoutSeconds);
+                    } catch (e) {
+                        console.error('Error enviando progreso final por timeout:', e);
+                    }
+                    
+                    // Detener monitoreo ANTES de ejecutar callback
                     stopTemperatureMonitoring();
                     
-                    // Reportar 0 segundos restantes como en sendRecipeProgressAndWait
-                    await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    
-                    // Ejecutar el callback como en 2.7.4
+                    // Ejecutar callback
                     if (typeof callback === 'function') {
-                        setTimeout(callback, 200); // Mismo delay que en 2.7.4
+                        console.log('🚀 Ejecutando callback por timeout');
+                        setTimeout(callback, 200);
                     }
                     return;
                 }
                 
-                // Actualizar tiempo y progreso (igual que en sendRecipeProgressAndWait)
+                // Actualizar tiempo y progreso
                 updateTimeDisplay(remainingTime, timeoutSeconds);
-                await sendRecipeProgressUpdate(remainingTime, timeoutSeconds);
                 
-            }, 1000); // Mismo intervalo que en 2.7.4
+                // Enviar actualización al dispositivo (manejo de errores mejorado)
+                try {
+                    await sendRecipeProgressUpdate(remainingTime, timeoutSeconds);
+                } catch (error) {
+                    console.error('❌ Error enviando actualización de tiempo:', error);
+                    // No detenemos el monitoreo por error de comunicación,
+                    // permitimos que siga intentando
+                }
+                
+            }, 1000);
             
-            // Guardar el callback para nextStep() como se hace con el timer
+            // Guardar el callback para nextStep()
             temperatureCheckInterval._savedCallback = callback;
         }
         
-        function stopTemperatureMonitoring() {
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
+        // CORREGIR: Remover la implementación duplicada si existe
+        
+        // CORREGIR: Asegurar que el reset realmente detiene todos los procesos
+        async function resetRecipe() {
+            if (!device || !device.gatt.connected) {
+                alert('Dispositivo no conectado');
+                return;
+            }
+            
+            console.log('🔄 Iniciando reset de receta...');
+            
+            // Detener todos los timers y monitoreos
+            stopAutomaticTimer();
+            stopTemperatureMonitoring();
+            
+            try {
+                console.log('📤 Enviando reset de paso...');
+                await sendRecipeStep(0, 0, false, 0);
+                console.log('📤 Enviando reset de progreso...');
+                await sendRecipeProgress(0, 0);
+                
+                // Ocultar todas las tarjetas relevantes
+                recipeProgressCard.classList.add('hidden');
+                actionRequiredCard.classList.add('hidden');
+                setpointContainer.classList.add('hidden');
+                
+                // Rehabilitar todos los botones
+                updateRecipeButtons(null);
+                
+                // Resetear estado
                 isWaitingForTemperature = false;
                 targetTemperature = 0;
-                console.log('🌡️ Monitoreo de temperatura detenido');
+                currentRemainingTime = 0;
+                currentTotalTime = 0;
+                isTimerActive = false;
+                
+                statusText.textContent = 'Receta reseteada';
+                console.log('✅ Receta reseteada completamente');
+            } catch (error) {
+                console.error('❌ ERROR en resetRecipe:', error);
+                statusText.textContent = 'Error al resetear: ' + error.message;
+                alert('Error al resetear la receta: ' + error.message);
             }
+        }
+        
+        // CORREGIR: Simplificar la receta de pasta para asegurar que muestra el tiempo
+        async function startPastaRecipe() {
+            if (!device || !device.gatt.connected) {
+                alert('Dispositivo no conectado');
+                return;
+            }
+
+            statusText.textContent = '🍝 Iniciando Pasta Italiana...';
+            console.log(`🍝 === INICIANDO RECETA PASTA ===`);
+            console.log(`🍝 Paso 1: Hervir agua (temp objetivo: 100°C o timeout: 480s)`);
+
+            // IMPORTANTE: Mostrar tarjeta de progreso primero
+            recipeProgressCard.classList.remove('hidden');
+            updateRecipeButtons('complex');
+
+            // Enviar paso 1
+            await sendRecipeStep(1, 3, false, 100);
+            
+            // IMPORTANTE: Esperar a que la tarjeta de progreso esté visible antes de iniciar
+            // Esto soluciona el problema donde no se ve el contador de tiempo
+            setTimeout(() => {
+                // Iniciar monitoreo de temperatura/tiempo
+                startTemperatureMonitoringWithCallback(100, 480, async () => {
+                    console.log(`🍝 Paso 1 completado -> Paso 2: Añadir pasta`);
+                    statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
+                    await sendMessage('Añadir pasta');
+                    await sendRecipeStep(2, 3, true, 100);
+                    
+                    await sendRecipeProgressAndWait(600, async () => {
+                        console.log(`🍝 Paso 2 completado -> Paso 3: Escurrir pasta`);
+                        statusText.textContent = '🍝 Escurrir la pasta';
+                        await sendMessage('Escurrir pasta');
+                        await sendRecipeStep(3, 3, true, 0);
+                        
+                        await sendRecipeProgressAndWait(60, () => {
+                            console.log(`🍝 Receta completada`);
+                            statusText.textContent = '🍝 ¡Pasta Italiana completada!';
+                            setpointContainer.classList.add('hidden');
+                        });
+                    });
+                });
+            }, 200); // Pequeño timeout para asegurar renderizado
         }
         
         async function startSteakRecipe() {
@@ -881,69 +989,31 @@
             });
         }
         
-        async function startPastaRecipe() {
-            if (!device || !device.gatt.connected) {
-                alert('Dispositivo no conectado');
-                return;
-            }
-
-            statusText.textContent = '🍝 Iniciando Pasta Italiana...';
-            console.log(`🍝 === INICIANDO RECETA PASTA ===`);
-
-            // Mostrar tarjeta de progreso para recetas complejas
-            recipeProgressCard.classList.remove('hidden');
-            
-            // Deshabilitar otros botones para recetas complejas
-            updateRecipeButtons('complex');
-
-            // Paso 1: Configurar como en 2.7.4 pero usar monitoreo de temperatura
-            await sendRecipeStep(1, 3, false, 100);
-            
-            // ADAPTACIÓN: En lugar de usar sendRecipeProgressAndWait, usamos monitoreo de temperatura 
-            // que responde a lo primero entre: alcanzar temperatura o tiempo transcurrido
-            startTemperatureMonitoringWithCallback(100, 480, async () => {
-                // Este callback se ejecuta igual que en 2.7.4, ya sea por temperatura o por timeout
-                
-                // Paso 2: Exactamente igual que en 2.7.4
-                statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
-                await sendMessage('Añadir pasta');
-                await sendRecipeStep(2, 3, true, 100);
-                await sendRecipeProgressAndWait(600, async () => {
-                    // Paso 3: Exactamente igual que en 2.7.4
-                    statusText.textContent = '🍝 Escurrir la pasta';
-                    await sendMessage('Escurrir pasta');
-                    await sendRecipeStep(3, 3, true, 0);
-                    await sendRecipeProgressAndWait(60, () => {
-                        statusText.textContent = '🍝 ¡Pasta Italiana completada!';
-                        // Ocultar temperatura objetivo cuando la receta termina
-                        setpointContainer.classList.add('hidden');
-                    });
-                });
-            });
-        }
-        
         // Función nueva para monitoreo de temperatura con timeout
         function startTemperatureMonitoringWithCallback(targetTemp, timeoutSeconds, callback) {
             // Detener cualquier timer activo
             stopAutomaticTimer();
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
-            }
+            stopTemperatureMonitoring(); // Asegurarse de limpiar monitoreo previo
             
             isWaitingForTemperature = true;
             targetTemperature = targetTemp;
             
-            console.log(`🌡️ Monitoreo: objetivo ${targetTemp}°C o timeout ${timeoutSeconds}s (lo primero que ocurra)`);
+            console.log(`🌡️ INICIANDO Monitoreo: objetivo ${targetTemp}°C o timeout ${timeoutSeconds}s`);
             
-            // Enviar progreso inicial igual que en sendRecipeProgressAndWait
-            sendRecipeProgress(timeoutSeconds, timeoutSeconds);
-            updateTimeDisplay(timeoutSeconds, timeoutSeconds);
+            // CORREGIR: Asegurarnos que se muestra el tiempo inicial
+            recipeProgressCard.classList.remove('hidden'); // Mostrar tarjeta de progreso
+            updateTimeDisplay(timeoutSeconds, timeoutSeconds); // Actualizar display primero
+            
+            // Ahora enviar la información al dispositivo
+            sendRecipeProgress(timeoutSeconds, timeoutSeconds)
+                .then(() => console.log('✅ Progreso inicial enviado correctamente'))
+                .catch(e => console.error('❌ Error enviando progreso inicial:', e));
             
             let remainingTime = timeoutSeconds;
             
             temperatureCheckInterval = setInterval(async () => {
                 if (!isWaitingForTemperature || !device || !device.gatt.connected) {
+                    console.log('❌ Monitoreo cancelado - dispositivo desconectado o monitoreo inactivo');
                     stopTemperatureMonitoring();
                     return;
                 }
@@ -951,56 +1021,72 @@
                 const currentTempText = currentTemp.textContent;
                 const currentTempValue = parseInt(currentTempText.replace('°C', ''));
                 
+                // LOGS ADICIONALES para debugging
+                if (remainingTime % 10 === 0) {
+                    console.log(`🌡️ Temperatura actual: ${currentTempValue}°C (objetivo: ${targetTemp}°C)`);
+                    console.log(`⏱️ Tiempo restante: ${remainingTime}s de ${timeoutSeconds}s`);
+                }
+                
                 // Condición 1: Temperatura alcanzada
                 if (currentTempValue >= (targetTemp - 2)) {
-                    console.log(`✅ Temperatura alcanzada: ${currentTempValue}°C >= ${targetTemp}°C`);
+                    console.log(`✅ TEMPERATURA ALCANZADA: ${currentTempValue}°C >= ${targetTemp}°C`);
+                    
+                    try {
+                        await sendRecipeProgressUpdate(0, timeoutSeconds);
+                    } catch (e) {
+                        console.error('Error enviando progreso final:', e);
+                    }
+                    
+                    // Detener monitoreo ANTES de ejecutar callback
                     stopTemperatureMonitoring();
                     
-                    // Reportar 0 segundos restantes como en sendRecipeProgressAndWait
-                    await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    
-                    // Ejecutar el callback como en 2.7.4
+                    // Ejecutar callback
                     if (typeof callback === 'function') {
-                        setTimeout(callback, 200); // Mismo delay que en 2.7.4
+                        console.log('🚀 Ejecutando callback por temperatura alcanzada');
+                        setTimeout(callback, 200);
                     }
                     return;
                 }
                 
-                // Condición 2: Tiempo agotado (igual que en sendRecipeProgressAndWait)
+                // Condición 2: Tiempo agotado
                 remainingTime--;
                 
                 if (remainingTime <= 0) {
-                    console.log(`⏰ Timeout alcanzado: ${timeoutSeconds}s transcurridos`);
+                    console.log(`⏰ TIMEOUT ALCANZADO: ${timeoutSeconds}s transcurridos`);
+                    
+                    try {
+                        await sendRecipeProgressUpdate(0, timeoutSeconds);
+                    } catch (e) {
+                        console.error('Error enviando progreso final por timeout:', e);
+                    }
+                    
+                    // Detener monitoreo ANTES de ejecutar callback
                     stopTemperatureMonitoring();
                     
-                    // Reportar 0 segundos restantes como en sendRecipeProgressAndWait
-                    await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    
-                    // Ejecutar el callback como en 2.7.4
+                    // Ejecutar callback
                     if (typeof callback === 'function') {
-                        setTimeout(callback, 200); // Mismo delay que en 2.7.4
+                        console.log('🚀 Ejecutando callback por timeout');
+                        setTimeout(callback, 200);
                     }
                     return;
                 }
                 
-                // Actualizar tiempo y progreso (igual que en sendRecipeProgressAndWait)
+                // Actualizar tiempo y progreso
                 updateTimeDisplay(remainingTime, timeoutSeconds);
-                await sendRecipeProgressUpdate(remainingTime, timeoutSeconds);
                 
-            }, 1000); // Mismo intervalo que en 2.7.4
+                // Enviar actualización al dispositivo (manejo de errores mejorado)
+                try {
+                    await sendRecipeProgressUpdate(remainingTime, timeoutSeconds);
+                } catch (error) {
+                    console.error('❌ Error enviando actualización de tiempo:', error);
+                    // No detenemos el monitoreo por error de comunicación,
+                    // permitimos que siga intentando
+                }
+                
+            }, 1000);
             
-            // Guardar el callback para nextStep() como se hace con el timer
+            // Guardar el callback para nextStep()
             temperatureCheckInterval._savedCallback = callback;
-        }
-        
-        function stopTemperatureMonitoring() {
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
-                isWaitingForTemperature = false;
-                targetTemperature = 0;
-                console.log('🌡️ Monitoreo de temperatura detenido');
-            }
         }
         
         // Adaptar nextStep para manejar tanto timers como monitoreo de temperatura
