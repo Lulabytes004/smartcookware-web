@@ -173,20 +173,12 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.3 - Build 20241212-009</div>
+    <div class="version-info">Versión 2.7.4 - Build 20241212-009</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
         <p class="status" id="statusText">Desconectado</p>
         <p class="status" id="batteryText"></p>
-    </div>
-    
-    <div class="card hidden" id="temperatureCard">
-        <h2>Temperatura</h2>
-        <div class="temperature" id="currentTemp">--°C</div>
-        <div id="setpointContainer" class="hidden">
-            <p>Temperatura objetivo: <span id="tempSetpoint">--°C</span></p>
-        </div>
     </div>
     
     <div class="card hidden" id="recipeProgressCard">
@@ -197,6 +189,14 @@
         </div>
         <div class="progress-container">
             <div class="progress-bar" id="progressBar" style="width:0%">0%</div>
+        </div>
+    </div>
+    
+    <div class="card hidden" id="temperatureCard">
+        <h2>Temperatura</h2>
+        <div class="temperature" id="currentTemp">--°C</div>
+        <div id="setpointContainer" class="hidden">
+            <p>Temperatura objetivo: <span id="tempSetpoint">--°C</span></p>
         </div>
     </div>
     
@@ -287,7 +287,7 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.3');
+        console.log('SmartCookware Web App - Versión 2.7.4');
         console.log('Build: 20241212-009');
         console.log('Características: Mensaje de acción personalizado + Ocultar temperatura al finalizar');
         
@@ -978,7 +978,7 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.3 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('%c SmartCookware Web App v2.7.4 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-009');
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Custom action messages + Hide temperature setpoint when recipe finishes');
