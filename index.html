@@ -173,12 +173,20 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.4 - Build 20241212-009</div>
+    <div class="version-info">Versión 2.7.3 - Build 20241212-009</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
         <p class="status" id="statusText">Desconectado</p>
         <p class="status" id="batteryText"></p>
+    </div>
+    
+    <div class="card hidden" id="temperatureCard">
+        <h2>Temperatura</h2>
+        <div class="temperature" id="currentTemp">--°C</div>
+        <div id="setpointContainer" class="hidden">
+            <p>Temperatura objetivo: <span id="tempSetpoint">--°C</span></p>
+        </div>
     </div>
     
     <div class="card hidden" id="recipeProgressCard">
@@ -189,14 +197,6 @@
         </div>
         <div class="progress-container">
             <div class="progress-bar" id="progressBar" style="width:0%">0%</div>
-        </div>
-    </div>
-    
-    <div class="card hidden" id="temperatureCard">
-        <h2>Temperatura</h2>
-        <div class="temperature" id="currentTemp">--°C</div>
-        <div id="setpointContainer" class="hidden">
-            <p>Temperatura objetivo: <span id="tempSetpoint">--°C</span></p>
         </div>
     </div>
     
@@ -287,9 +287,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.4');
+        console.log('SmartCookware Web App - Versión 2.7.3');
         console.log('Build: 20241212-009');
-        console.log('Características: Control por temperatura + Reorganización UI');
+        console.log('Características: Mensaje de acción personalizado + Ocultar temperatura al finalizar');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -324,11 +324,6 @@
         
         // Variable para controlar el estado de la receta
         let activeRecipe = null; // null, 'simple', 'complex'
-        
-        // Variables para control de temperatura
-        let isWaitingForTemperature = false;
-        let targetTemperature = 0;
-        let temperatureCheckInterval = null;
         
         // Elementos del DOM
         const connectButton = document.getElementById('connectButton');
@@ -558,7 +553,6 @@
             updateRecipeButtons(null);
             
             stopAutomaticTimer();
-            stopTemperatureMonitoring();
         }
         
         function handleBatteryChange(event) {
@@ -764,10 +758,7 @@
             updateRecipeButtons('complex');
             
             await sendRecipeStep(1, 3, false, 240);
-            await sendRecipeProgress(240, 240);
-            
-            // Usar monitoreo de temperatura en lugar de timer fijo
-            startTemperatureMonitoringWithCallback(240, 300, async () => {
+            await sendRecipeProgressAndWait(240, async () => {
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendMessage('Colocar filete');
                 await sendRecipeStep(2, 3, true, 220);
@@ -777,6 +768,7 @@
                     await sendRecipeStep(3, 3, true, 200);
                     await sendRecipeProgressAndWait(240, () => {
                         statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
+                        // Ocultar temperatura objetivo cuando la receta termina
                         setpointContainer.classList.add('hidden');
                     });
                 });
@@ -798,15 +790,14 @@
 
             statusText.textContent = '🍝 Iniciando Pasta Italiana...';
 
+            // Mostrar tarjeta de progreso para recetas complejas
             recipeProgressCard.classList.remove('hidden');
             
+            // Deshabilitar otros botones para recetas complejas
             updateRecipeButtons('complex');
 
             await sendRecipeStep(1, 3, false, 100);
-            await sendRecipeProgress(480, 480);
-            
-            // Usar monitoreo de temperatura en lugar de timer fijo
-            startTemperatureMonitoringWithCallback(100, 600, async () => {
+            await sendRecipeProgressAndWait(480, async () => {
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendMessage('Añadir pasta');
                 await sendRecipeStep(2, 3, true, 100);
@@ -816,6 +807,7 @@
                     await sendRecipeStep(3, 3, true, 0);
                     await sendRecipeProgressAndWait(60, () => {
                         statusText.textContent = '🍝 ¡Pasta Italiana completada!';
+                        // Ocultar temperatura objetivo cuando la receta termina
                         setpointContainer.classList.add('hidden');
                     });
                 });
@@ -829,7 +821,6 @@
             }
             
             stopAutomaticTimer();
-            stopTemperatureMonitoring();
             
             await sendRecipeStep(0, 0, false, 0);
             await sendRecipeProgress(0, 0);
@@ -933,95 +924,64 @@
             }
         }
         
-        // Nueva función para detener el monitoreo de temperatura
-        function stopTemperatureMonitoring() {
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
-                isWaitingForTemperature = false;
-                targetTemperature = 0;
-                console.log('🌡️ Monitoreo de temperatura detenido');
+        async function sendRecipeProgressUpdate(remainingTime, totalTime) {
+            if (!progressCharacteristic) return;
+            
+            try {
+                const data = new Uint8Array([
+                    (remainingTime >> 8) & 0xFF,
+                    remainingTime & 0xFF,
+                    (totalTime >> 8) & 0xFF,
+                    totalTime & 0xFF
+                ]);
+                
+                await progressCharacteristic.writeValue(data);
+                
+                if (remainingTime % 10 === 0 || remainingTime <= 5) {
+                    console.log(`⏱️ Tiempo actualizado: ${remainingTime}s restantes de ${totalTime}s`);
+                }
+                
+            } catch (error) {
+                console.error('Error al enviar actualización de tiempo:', error);
+                throw error;
             }
         }
         
-        // Nueva función para iniciar monitoreo de temperatura con timeout
-        function startTemperatureMonitoringWithCallback(targetTemp, timeoutSeconds, callback) {
-            stopTemperatureMonitoring();
-            stopAutomaticTimer();
+        async function nextStep() {
+            if (!device || !device.gatt.connected) {
+                alert('Dispositivo no conectado');
+                return;
+            }
             
-            isWaitingForTemperature = true;
-            targetTemperature = targetTemp;
+            if (!isTimerActive) {
+                alert('No hay timer activo para acelerar');
+                return;
+            }
             
-            console.log(`🌡️ Iniciando monitoreo de temperatura: objetivo ${targetTemp}°C, timeout ${timeoutSeconds}s`);
-            
-            updateTimeDisplay(timeoutSeconds, timeoutSeconds);
-            statusText.textContent = `🌡️ Esperando temperatura: ${targetTemp}°C`;
-            
-            let remainingTime = timeoutSeconds;
-            
-            temperatureCheckInterval = setInterval(async () => {
-                if (!isWaitingForTemperature || !device || !device.gatt.connected) {
-                    console.log('🌡️ Monitoreo detenido - dispositivo desconectado');
-                    stopTemperatureMonitoring();
-                    return;
-                }
-                
-                const currentTempText = currentTemp.textContent;
-                const currentTempValue = parseInt(currentTempText.replace('°C', ''));
-                
-                if (currentTempValue >= (targetTemperature - 2)) {
-                    console.log(`✅ Temperatura alcanzada: ${currentTempValue}°C >= ${targetTemperature}°C`);
-                    
-                    updateTimeDisplay(0, timeoutSeconds);
-                    
-                    try {
-                        await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    } catch (e) {
-                        console.error('Error enviando progreso final:', e);
-                    }
-                    
-                    stopTemperatureMonitoring();
-                    
-                    if (typeof callback === 'function') {
-                        setTimeout(callback, 200);
-                    }
-                    return;
-                }
-                
-                remainingTime--;
-                updateTimeDisplay(remainingTime, timeoutSeconds);
-                
-                if (remainingTime <= 0) {
-                    console.log(`⏰ Timeout alcanzado sin llegar a temperatura objetivo`);
-                    statusText.textContent = `⚠️ Timeout: continuar manualmente`;
-                    
-                    try {
-                        await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    } catch (e) {}
-                    
-                    stopTemperatureMonitoring();
-                    
-                    if (typeof callback === 'function') {
-                        setTimeout(callback, 200);
-                    }
-                    return;
-                }
+            // Solo acelerar a 5 segundos si el tiempo restante es mayor a 5
+            if (currentRemainingTime > 5) {
+                currentRemainingTime = 5;
+                updateTimeDisplay(currentRemainingTime, currentTotalTime);
                 
                 try {
-                    await sendRecipeProgressUpdate(remainingTime, timeoutSeconds);
+                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                    statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
                 } catch (error) {
-                    console.error('Error enviando actualización:', error);
-                    stopTemperatureMonitoring();
+                    console.error('Error al acelerar paso:', error);
+                    statusText.textContent = 'Error al acelerar paso: ' + error.message;
                 }
-                
-            }, 1000);
+            } else {
+                // Si ya está en 5 segundos o menos, no hacer nada
+                console.log('El timer ya está cerca del final, no se acelera');
+                statusText.textContent = 'Timer ya está terminando...';
+            }
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.4 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('%c SmartCookware Web App v2.7.3 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-009');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Temperature-based step completion + Recipe progress reordered');
+            console.log('New features: Custom action messages + Hide temperature setpoint when recipe finishes');
         });
         
         function updateBatteryLevel(value) {
