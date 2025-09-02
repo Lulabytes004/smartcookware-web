@@ -803,10 +803,10 @@
             updateRecipeButtons('complex');
 
             await sendRecipeStep(1, 3, false, 100);
-            await sendRecipeProgress(480, 480);
+            await sendRecipeProgress(480, 480);  // 8 minutos = 480 segundos
             
             // CAMBIAR ESTA LÍNEA: usar monitoreo de temperatura en lugar de timer fijo
-            startTemperatureMonitoringWithCallback(100, 600, async () => {
+            startTemperatureMonitoringWithCallback(100, 480, async () => {  // timeout 8 minutos
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendMessage('Añadir pasta');
                 await sendRecipeStep(2, 3, true, 100);
@@ -981,7 +981,7 @@
                     statusText.textContent = 'Error al acelerar paso: ' + error.message;
                 }
             }
-            // AÑADIR ESTA SECCIÓN para acelerar monitoreo de temperatura
+            // CORREGIR ESTA SECCIÓN para acelerar monitoreo de temperatura
             else if (isWaitingForTemperature) {
                 console.log('⏩ Forzando finalización de monitoreo de temperatura...');
                 statusText.textContent = '⏩ Forzando temperatura alcanzada...';
@@ -994,42 +994,39 @@
                     console.error('Error enviando progreso final:', e);
                 }
                 
-                // Simular que se alcanzó la temperatura
-                const currentTempValue = parseInt(currentTemp.textContent.replace('°C', ''));
-                if (currentTempValue >= (targetTemperature - 2)) {
-                    stopTemperatureMonitoring();
-                    
-                    // Buscar y ejecutar el callback del primer paso
-                    setTimeout(async () => {
-                        if (statusText.textContent.includes('Filete')) {
-                            statusText.textContent = '🥩 Colocar filete en la sartén';
-                            await sendMessage('Colocar filete');
-                            await sendRecipeStep(2, 3, true, 220);
-                            await sendRecipeProgressAndWait(300, async () => {
-                                statusText.textContent = '🥩 Voltear el filete';
-                                await sendMessage('Voltear filete');
-                                await sendRecipeStep(3, 3, true, 200);
-                                await sendRecipeProgressAndWait(240, () => {
-                                    statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
-                                    setpointContainer.classList.add('hidden');
-                                });
+                // Forzar la finalización del monitoreo de temperatura
+                stopTemperatureMonitoring();
+                
+                // Ejecutar directamente el callback correspondiente
+                setTimeout(async () => {
+                    if (statusText.textContent.includes('Filete')) {
+                        statusText.textContent = '🥩 Colocar filete en la sartén';
+                        await sendMessage('Colocar filete');
+                        await sendRecipeStep(2, 3, true, 220);
+                        await sendRecipeProgressAndWait(300, async () => {
+                            statusText.textContent = '🥩 Voltear el filete';
+                            await sendMessage('Voltear filete');
+                            await sendRecipeStep(3, 3, true, 200);
+                            await sendRecipeProgressAndWait(240, () => {
+                                statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
+                                setpointContainer.classList.add('hidden');
                             });
-                        } else if (statusText.textContent.includes('Pasta')) {
-                            statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
-                            await sendMessage('Añadir pasta');
-                            await sendRecipeStep(2, 3, true, 100);
-                            await sendRecipeProgressAndWait(600, async () => {
-                                statusText.textContent = '🍝 Escurrir la pasta';
-                                await sendMessage('Escurrir pasta');
-                                await sendRecipeStep(3, 3, true, 0);
-                                await sendRecipeProgressAndWait(60, () => {
-                                    statusText.textContent = '🍝 ¡Pasta Italiana completada!';
-                                    setpointContainer.classList.add('hidden');
-                                });
+                        });
+                    } else if (statusText.textContent.includes('Pasta')) {
+                        statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
+                        await sendMessage('Añadir pasta');
+                        await sendRecipeStep(2, 3, true, 100);
+                        await sendRecipeProgressAndWait(600, async () => {
+                            statusText.textContent = '🍝 Escurrir la pasta';
+                            await sendMessage('Escurrir pasta');
+                            await sendRecipeStep(3, 3, true, 0);
+                            await sendRecipeProgressAndWait(60, () => {
+                                statusText.textContent = '🍝 ¡Pasta Italiana completada!';
+                                setpointContainer.classList.add('hidden');
                             });
-                        }
-                    }, 200);
-                }
+                        });
+                    }
+                }, 200);
             }
             else {
                 console.log('El timer ya está cerca del final, no se acelera');
@@ -1038,37 +1035,6 @@
         }
         
         // ...existing code...
-        
-        function updateBatteryLevel(value) {
-            // Verificar que tenemos al menos 1 byte antes de leer
-            if (value.byteLength >= 1) {
-                const batteryLevel = value.getUint8(0);
-                batteryText.textContent = `Batería: ${batteryLevel}%`;
-            } else {
-                console.error('Error: Datos de batería insuficientes, recibidos:', value.byteLength, 'bytes');
-            }
-        }
-        
-        function updateTemperature(value) {
-            // Verificar que tenemos al menos 2 bytes antes de leer uint16
-            if (value.byteLength >= 2) {
-                const temp = value.getUint16(0, false);
-                currentTemp.textContent = `${temp}°C`;
-            } else {
-                console.error('Error: Datos de temperatura insuficientes, recibidos:', value.byteLength, 'bytes, se esperaban 2');
-            }
-        }
-        
-        // AÑADIR ESTAS DOS FUNCIONES
-        function stopTemperatureMonitoring() {
-            if (temperatureCheckInterval) {
-                clearInterval(temperatureCheckInterval);
-                temperatureCheckInterval = null;
-                isWaitingForTemperature = false;
-                targetTemperature = 0;
-                console.log('🌡️ Monitoreo de temperatura detenido');
-            }
-        }
         
         function startTemperatureMonitoringWithCallback(targetTemp, timeoutSeconds, callback) {
             stopTemperatureMonitoring();
@@ -1084,6 +1050,7 @@
             
             let remainingTime = timeoutSeconds;
             
+            // GUARDAR EL CALLBACK EN UNA VARIABLE ACCESIBLE
             temperatureCheckInterval = setInterval(async () => {
                 if (!isWaitingForTemperature || !device || !device.gatt.connected) {
                     console.log('🌡️ Monitoreo detenido - dispositivo desconectado');
@@ -1140,7 +1107,12 @@
                 }
                 
             }, 1000);
+            
+            // GUARDAR EL CALLBACK EN EL INTERVAL PARA ACCESO POSTERIOR
+            temperatureCheckInterval._savedCallback = callback;
         }
+        
+        // ...existing code...
         
         window.addEventListener('load', () => {
             console.log('%c SmartCookware Web App v2.7.5 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
@@ -1148,6 +1120,37 @@
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Temperature monitoring for first step + Working timers');
         });
+        
+        function updateBatteryLevel(value) {
+            // Verificar que tenemos al menos 1 byte antes de leer
+            if (value.byteLength >= 1) {
+                const batteryLevel = value.getUint8(0);
+                batteryText.textContent = `Batería: ${batteryLevel}%`;
+            } else {
+                console.error('Error: Datos de batería insuficientes, recibidos:', value.byteLength, 'bytes');
+            }
+        }
+        
+        function updateTemperature(value) {
+            // Verificar que tenemos al menos 2 bytes antes de leer uint16
+            if (value.byteLength >= 2) {
+                const temp = value.getUint16(0, false);
+                currentTemp.textContent = `${temp}°C`;
+            } else {
+                console.error('Error: Datos de temperatura insuficientes, recibidos:', value.byteLength, 'bytes, se esperaban 2');
+            }
+        }
+        
+        // AÑADIR ESTAS DOS FUNCIONES
+        function stopTemperatureMonitoring() {
+            if (temperatureCheckInterval) {
+                clearInterval(temperatureCheckInterval);
+                temperatureCheckInterval = null;
+                isWaitingForTemperature = false;
+                targetTemperature = 0;
+                console.log('🌡️ Monitoreo de temperatura detenido');
+            }
+        }
     </script>
 </body>
 </html>
