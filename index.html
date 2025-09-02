@@ -289,7 +289,7 @@
         // Mostrar información de versión en la consola para debug
         console.log('SmartCookware Web App - Versión 2.7.6');
         console.log('Build: 20241212-011');
-        console.log('Características: Avance automático al confirmar acción + Monitoreo de temperatura');
+        console.log('Características: Integración con botón CONTINUAR + Monitoreo de temperatura');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -578,6 +578,21 @@
                 const continueValue = value.getUint8(0);
                 if (continueValue === 1) {
                     actionRequiredCard.classList.add('hidden');
+                    
+                    // Si hay un timer activo, acelerar al siguiente paso
+                    if (isTimerActive && currentRemainingTime > 5) {
+                        console.log('✅ Botón físico presionado - acelerando al siguiente paso');
+                        currentRemainingTime = 5;
+                        updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                        
+                        try {
+                            sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime)
+                                .then(() => statusText.textContent = '⏩ Avanzando al siguiente paso...')
+                                .catch(error => console.error('Error al acelerar paso:', error));
+                        } catch (error) {
+                            console.error('Error al acelerar paso:', error);
+                        }
+                    }
                 }
             } else {
                 console.error('Error: Datos de continue insuficientes, recibidos:', value.byteLength, 'bytes');
@@ -605,31 +620,29 @@
             }
         }
         
-        // Función mejorada para enviar señal de continuar y avanzar al siguiente paso
         async function sendContinueSignal() {
             if (!continueCharacteristic) return;
             
             try {
-                // Enviar señal al dispositivo
+                // 1. Enviar señal al dispositivo BLE
                 const value = new Uint8Array([1]);
                 await continueCharacteristic.writeValue(value);
                 
-                // Ocultar la tarjeta de acción requerida
+                // 2. Simular exactamente el mismo comportamiento que en handleContinueChange
                 actionRequiredCard.classList.add('hidden');
                 
-                // Nuevo: Avanzar automáticamente el timer para pasar al siguiente paso
-                if (isTimerActive) {
-                    console.log('✅ Acción confirmada - avanzando automáticamente al siguiente paso');
-                    statusText.textContent = '⏩ Avanzando al siguiente paso...';
-                    
-                    // Establecer el tiempo a 5 segundos para avanzar rápidamente
+                // 3. Acelerar al siguiente paso si hay un timer activo
+                if (isTimerActive && currentRemainingTime > 5) {
+                    console.log('✅ Botón CONTINUAR pulsado - acelerando al siguiente paso');
                     currentRemainingTime = 5;
                     updateTimeDisplay(currentRemainingTime, currentTotalTime);
                     
                     try {
                         await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                        statusText.textContent = '⏩ Avanzando al siguiente paso...';
                     } catch (error) {
-                        console.error('Error al acelerar paso después de acción:', error);
+                        console.error('Error al acelerar paso:', error);
+                        statusText.textContent = 'Error al acelerar paso: ' + error.message;
                     }
                 } else {
                     statusText.textContent = 'Acción completada';
@@ -1035,7 +1048,7 @@
             console.log('%c SmartCookware Web App v2.7.6 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Auto-next on action + Temperature monitoring for first steps');
+            console.log('New features: Integración botón CONTINUAR con timer + Temperature monitoring');
         });
         
         function updateBatteryLevel(value) {
