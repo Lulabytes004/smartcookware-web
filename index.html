@@ -963,7 +963,8 @@
             
             let remainingTime = timeoutSeconds;
             
-            temperatureCheckInterval = setInterval(async () => {
+            // Función del intervalo con callback guardado
+            const intervalFunction = async () => {
                 if (!isWaitingForTemperature || !device || !device.gatt.connected) {
                     console.log('🌡️ Monitoreo detenido - dispositivo desconectado');
                     stopTemperatureMonitoring();
@@ -1017,8 +1018,11 @@
                     console.error('Error enviando actualización:', error);
                     stopTemperatureMonitoring();
                 }
-                
-            }, 1000);
+            };
+            
+            // Guardar el callback en el interval para poder accederlo después
+            temperatureCheckInterval = setInterval(intervalFunction, 1000);
+            temperatureCheckInterval._callback = callback;
         }
         
         window.addEventListener('load', () => {
