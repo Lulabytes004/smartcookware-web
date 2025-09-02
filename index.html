@@ -484,27 +484,31 @@
         }
         
         function handleBatteryChange(event) {
-            updateBatteryLevel(event.target.value);
-        }
-        
-        function updateBatteryLevel(value) {
-            const batteryLevel = value.getUint8(0);
-            batteryText.textContent = `Batería: ${batteryLevel}%`;
+            try {
+                updateBatteryLevel(event.target.value);
+            } catch (error) {
+                console.error('Error al procesar cambio de batería:', error);
+            }
         }
         
         function handleTemperatureChange(event) {
-            updateTemperature(event.target.value);
-        }
-        
-        function updateTemperature(value) {
-            const temp = value.getUint16(0, false);
-            currentTemp.textContent = `${temp}°C`;
+            try {
+                updateTemperature(event.target.value);
+            } catch (error) {
+                console.error('Error al procesar cambio de temperatura:', error);
+            }
         }
         
         function handleContinueChange(event) {
-            const continueValue = event.target.value.getUint8(0);
-            if (continueValue === 1) {
-                actionRequiredCard.classList.add('hidden');
+            const value = event.target.value;
+            // Verificar que tenemos al menos 1 byte antes de leer
+            if (value.byteLength >= 1) {
+                const continueValue = value.getUint8(0);
+                if (continueValue === 1) {
+                    actionRequiredCard.classList.add('hidden');
+                }
+            } else {
+                console.error('Error: Datos de continue insuficientes, recibidos:', value.byteLength, 'bytes');
             }
         }
         
