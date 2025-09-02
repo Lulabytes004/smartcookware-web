@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.1 - Build 20241212-008</div>
+    <div class="version-info">Versión 2.7.3 - Build 20241212-009</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -287,9 +287,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.1');
-        console.log('Build: 20241212-008');
-        console.log('Características: Ocultar progreso de receta en modos Hervir/Freír');
+        console.log('SmartCookware Web App - Versión 2.7.3');
+        console.log('Build: 20241212-009');
+        console.log('Características: Mensaje de acción personalizado + Ocultar temperatura al finalizar');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -768,6 +768,8 @@
                     await sendRecipeStep(3, 3, true, 200);
                     await sendRecipeProgressAndWait(240, () => {
                         statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
+                        // Ocultar temperatura objetivo cuando la receta termina
+                        setpointContainer.classList.add('hidden');
                     });
                 });
             });
@@ -805,6 +807,8 @@
                     await sendRecipeStep(3, 3, true, 0);
                     await sendRecipeProgressAndWait(60, () => {
                         statusText.textContent = '🍝 ¡Pasta Italiana completada!';
+                        // Ocultar temperatura objetivo cuando la receta termina
+                        setpointContainer.classList.add('hidden');
                     });
                 });
             });
@@ -974,10 +978,10 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.1 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-008');
+            console.log('%c SmartCookware Web App v2.7.3 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-009');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Hide recipe progress section for Boil/Fry modes');
+            console.log('New features: Custom action messages + Hide temperature setpoint when recipe finishes');
         });
         
         function updateBatteryLevel(value) {
