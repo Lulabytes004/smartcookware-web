@@ -630,27 +630,25 @@
             
             try {
                 const data = new Uint8Array([
-                    step, 
-                    totalSteps,
-                    actionRequired ? 1 : 0,
-                    (tempTarget >> 8) & 0xFF,
-                    tempTarget & 0xFF
+                    step,                           // Byte 0: Paso actual
+                    totalSteps,                     // Byte 1: Total de pasos
+                    actionRequired ? 1 : 0,         // Byte 2: Acción requerida (0=No, 1=Sí) ✅
+                    (tempTarget >> 8) & 0xFF,       // Byte 3: Temperatura high byte
+                    tempTarget & 0xFF               // Byte 4: Temperatura low byte
                 ]);
                 
                 await stepsCharacteristic.writeValue(data);
                 
                 stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
-                // NO mostrar automáticamente recipeProgressCard aquí
-                // recipeProgressCard.classList.remove('hidden');
                 
                 if (tempTarget > 0) {
                     tempSetpoint.textContent = `${tempTarget}°C`;
                     setpointContainer.classList.remove('hidden');
                 } else {
-                    // Si temperatura es 0, ocultar el contenedor de temperatura objetivo
                     setpointContainer.classList.add('hidden');
                 }
                 
+                // MOSTRAR "ACCIÓN REQUERIDA" EN LA WEB SI ES NECESARIO
                 if (actionRequired) {
                     actionRequiredCard.classList.remove('hidden');
                 }
@@ -904,7 +902,11 @@
                     updateTimeDisplay(0, currentTotalTime);
                     console.log('✅ Timer completado - ejecutando callback');
 
-                    try { await sendRecipeProgressUpdate(0, currentTotalTime); } catch (e) {}
+                    try { 
+                        await sendRecipeProgressUpdate(0, currentTotalTime); 
+                    } catch (e) {
+                        console.error('Error enviando progreso final:', e);
+                    }
 
                     stopAutomaticTimer();
 
@@ -1060,7 +1062,6 @@
             
             let remainingTime = timeoutSeconds;
             
-            // GUARDAR EL CALLBACK EN UNA VARIABLE ACCESIBLE
             temperatureCheckInterval = setInterval(async () => {
                 if (!isWaitingForTemperature || !device || !device.gatt.connected) {
                     console.log('🌡️ Monitoreo detenido - dispositivo desconectado');
@@ -1094,15 +1095,17 @@
                 updateTimeDisplay(remainingTime, timeoutSeconds);
                 
                 if (remainingTime <= 0) {
-                    console.log(`⏰ Timeout alcanzado sin llegar a temperatura objetivo`);
-                    statusText.textContent = `⚠️ Timeout: continuar manualmente`;
+                    console.log(`⏰ Timeout alcanzado - ejecutando callback`);
                     
                     try {
                         await sendRecipeProgressUpdate(0, timeoutSeconds);
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error('Error enviando progreso final:', e);
+                    }
                     
                     stopTemperatureMonitoring();
                     
+                    // EJECUTAR EL CALLBACK TAMBIÉN EN TIMEOUT
                     if (typeof callback === 'function') {
                         setTimeout(callback, 200);
                     }
@@ -1118,7 +1121,6 @@
                 
             }, 1000);
             
-            // GUARDAR EL CALLBACK EN EL INTERVAL PARA ACCESO POSTERIOR
             temperatureCheckInterval._savedCallback = callback;
         }
         
