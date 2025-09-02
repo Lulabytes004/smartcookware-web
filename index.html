@@ -848,15 +848,22 @@
                 return;
             }
             
-            currentRemainingTime = 5;
-            updateTimeDisplay(currentRemainingTime, currentTotalTime);
-            
-            try {
-                await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
-                statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
-            } catch (error) {
-                console.error('Error al acelerar paso:', error);
-                statusText.textContent = 'Error al acelerar paso: ' + error.message;
+            // Solo acelerar a 5 segundos si el tiempo restante es mayor a 5
+            if (currentRemainingTime > 5) {
+                currentRemainingTime = 5;
+                updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                
+                try {
+                    await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                    statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
+                } catch (error) {
+                    console.error('Error al acelerar paso:', error);
+                    statusText.textContent = 'Error al acelerar paso: ' + error.message;
+                }
+            } else {
+                // Si ya está en 5 segundos o menos, no hacer nada
+                console.log('El timer ya está cerca del final, no se acelera');
+                statusText.textContent = 'Timer ya está terminando...';
             }
         }
         
