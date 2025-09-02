@@ -981,52 +981,62 @@
                     statusText.textContent = 'Error al acelerar paso: ' + error.message;
                 }
             }
-            // CORREGIR ESTA SECCIÓN para acelerar monitoreo de temperatura
+            // CORREGIR ESTA SECCIÓN para acelerar monitoreo de temperatura A 5 SEGUNDOS
             else if (isWaitingForTemperature) {
-                console.log('⏩ Forzando finalización de monitoreo de temperatura...');
-                statusText.textContent = '⏩ Forzando temperatura alcanzada...';
+                console.log('⏩ Acelerando monitoreo de temperatura a 5 segundos...');
+                statusText.textContent = '⏩ Acelerando al siguiente paso... (5 segundos)';
                 
-                updateTimeDisplay(0, targetTemperature);
+                // Cambiar las variables de tiempo del monitoreo de temperatura
+                let remainingTime = 5;
+                updateTimeDisplay(remainingTime, targetTemperature);
                 
-                try {
-                    await sendRecipeProgressUpdate(0, targetTemperature);
-                } catch (e) {
-                    console.error('Error enviando progreso final:', e);
+                // Detener el interval actual
+                if (temperatureCheckInterval) {
+                    clearInterval(temperatureCheckInterval);
                 }
                 
-                // Forzar la finalización del monitoreo de temperatura
-                stopTemperatureMonitoring();
+                // Obtener el callback guardado
+                const savedCallback = temperatureCheckInterval._savedCallback;
                 
-                // Ejecutar directamente el callback correspondiente
-                setTimeout(async () => {
-                    if (statusText.textContent.includes('Filete')) {
-                        statusText.textContent = '🥩 Colocar filete en la sartén';
-                        await sendMessage('Colocar filete');
-                        await sendRecipeStep(2, 3, true, 220);
-                        await sendRecipeProgressAndWait(300, async () => {
-                            statusText.textContent = '🥩 Voltear el filete';
-                            await sendMessage('Voltear filete');
-                            await sendRecipeStep(3, 3, true, 200);
-                            await sendRecipeProgressAndWait(240, () => {
-                                statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
-                                setpointContainer.classList.add('hidden');
-                            });
-                        });
-                    } else if (statusText.textContent.includes('Pasta')) {
-                        statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
-                        await sendMessage('Añadir pasta');
-                        await sendRecipeStep(2, 3, true, 100);
-                        await sendRecipeProgressAndWait(600, async () => {
-                            statusText.textContent = '🍝 Escurrir la pasta';
-                            await sendMessage('Escurrir pasta');
-                            await sendRecipeStep(3, 3, true, 0);
-                            await sendRecipeProgressAndWait(60, () => {
-                                statusText.textContent = '🍝 ¡Pasta Italiana completada!';
-                                setpointContainer.classList.add('hidden');
-                            });
-                        });
+                // Crear un nuevo interval que cuente desde 5 segundos
+                temperatureCheckInterval = setInterval(async () => {
+                    if (!isWaitingForTemperature || !device || !device.gatt.connected) {
+                        console.log('🌡️ Monitoreo detenido - dispositivo desconectado');
+                        stopTemperatureMonitoring();
+                        return;
                     }
-                }, 200);
+                    
+                    remainingTime--;
+                    updateTimeDisplay(remainingTime, targetTemperature);
+                    
+                    if (remainingTime <= 0) {
+                        console.log('⏩ Aceleración completada - ejecutando siguiente paso');
+                        
+                        try {
+                            await sendRecipeProgressUpdate(0, targetTemperature);
+                        } catch (e) {
+                            console.error('Error enviando progreso final:', e);
+                        }
+                        
+                        stopTemperatureMonitoring();
+                        
+                        if (typeof savedCallback === 'function') {
+                            setTimeout(savedCallback, 200);
+                        }
+                        return;
+                    }
+                    
+                    try {
+                        await sendRecipeProgressUpdate(remainingTime, targetTemperature);
+                    } catch (error) {
+                        console.error('Error enviando actualización:', error);
+                        stopTemperatureMonitoring();
+                    }
+                    
+                }, 1000);
+                
+                // Re-guardar el callback
+                temperatureCheckInterval._savedCallback = savedCallback;
             }
             else {
                 console.log('El timer ya está cerca del final, no se acelera');
