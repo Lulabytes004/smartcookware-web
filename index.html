@@ -758,10 +758,12 @@
             updateRecipeButtons('complex');
             
             await sendRecipeStep(1, 3, false, 240);
+            // Pasar la temperatura objetivo como parámetro adicional (240°C)
             await sendRecipeProgressAndWait(240, async () => {
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendMessage('Colocar filete');
                 await sendRecipeStep(2, 3, true, 220);
+                // Pasos siguientes sin monitoreo de temperatura
                 await sendRecipeProgressAndWait(300, async () => {
                     statusText.textContent = '🥩 Voltear el filete';
                     await sendMessage('Voltear filete');
@@ -772,14 +774,15 @@
                         setpointContainer.classList.add('hidden');
                     });
                 });
-            });
+            }, 240); // Pasar 240°C como temperatura objetivo a monitorear
         }
         
-        async function sendRecipeProgressAndWait(totalTime, nextStepCallback) {
+        async function sendRecipeProgressAndWait(totalTime, nextStepCallback, targetTemperature = null) {
             const remaining = totalTime;
-            console.log(`📤 Enviando progreso y esperando: ${totalTime}s`);
+            console.log(`📤 Enviando progreso y esperando: ${totalTime}s` + 
+                (targetTemperature ? ` (con monitoreo de temperatura: ${targetTemperature}°C)` : ''));
             await sendRecipeProgress(remaining, totalTime);
-            startAutomaticTimerWithCallback(remaining, totalTime, nextStepCallback);
+            startAutomaticTimerWithCallback(remaining, totalTime, nextStepCallback, targetTemperature);
         }
         
         async function startPastaRecipe() {
@@ -797,10 +800,12 @@
             updateRecipeButtons('complex');
 
             await sendRecipeStep(1, 3, false, 100);
+            // Pasar la temperatura objetivo como parámetro adicional (100°C)
             await sendRecipeProgressAndWait(480, async () => {
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendMessage('Añadir pasta');
                 await sendRecipeStep(2, 3, true, 100);
+                // Pasos siguientes sin monitoreo de temperatura
                 await sendRecipeProgressAndWait(600, async () => {
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendMessage('Escurrir pasta');
@@ -811,7 +816,7 @@
                         setpointContainer.classList.add('hidden');
                     });
                 });
-            });
+            }, 100); // Pasar 100°C como temperatura objetivo a monitorear
         }
         
         async function resetRecipe() {
@@ -870,14 +875,16 @@
             }, 1000);
         }
         
-        function startAutomaticTimerWithCallback(remainingTime, totalTime, callback) {
+        // Versión modificada para incluir comprobación de temperatura
+        function startAutomaticTimerWithCallback(remainingTime, totalTime, callback, targetTemperature = null) {
             stopAutomaticTimer();
 
             currentRemainingTime = remainingTime;
             currentTotalTime = totalTime;
             isTimerActive = true;
 
-            console.log(`🚀 Iniciando timer con callback: ${remainingTime}s de ${totalTime}s`);
+            console.log(`🚀 Iniciando timer con callback: ${remainingTime}s de ${totalTime}s` + 
+                (targetTemperature ? ` (con monitoreo de temperatura: ${targetTemperature}°C)` : ''));
             updateTimeDisplay(currentRemainingTime, currentTotalTime);
 
             timerInterval = setInterval(async () => {
@@ -886,9 +893,35 @@
                     stopAutomaticTimer();
                     return;
                 }
+                
+                // Comprobar temperatura si tenemos un valor objetivo
+                if (targetTemperature !== null) {
+                    // Leer temperatura actual del elemento DOM
+                    const currentTempText = currentTemp.textContent;
+                    const currentTempValue = parseInt(currentTempText.replace('°C', ''));
+                    
+                    // Verificar si hemos alcanzado la temperatura objetivo (con 2°C de tolerancia)
+                    if (currentTempValue >= (targetTemperature - 2)) {
+                        console.log(`✅ Temperatura alcanzada: ${currentTempValue}°C >= ${targetTemperature}°C - acelerando timer a 5s`);
+                        // Acelerar el timer a 5 segundos restantes
+                        currentRemainingTime = 5;
+                        updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                        
+                        try {
+                            await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
+                            statusText.textContent = '⏩ Acelerando por temperatura...';
+                        } catch (error) {
+                            console.error('Error al actualizar progreso:', error);
+                        }
+                    }
+                }
 
+                // Continuar con la lógica normal del timer
                 currentRemainingTime--;
-                console.log(`⏰ Timer: ${currentRemainingTime}s restantes`);
+                
+                if (currentRemainingTime % 10 === 0 || currentRemainingTime <= 5) {
+                    console.log(`⏰ Timer: ${currentRemainingTime}s restantes`);
+                }
 
                 if (currentRemainingTime <= 0) {
                     currentRemainingTime = 0;
