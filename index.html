@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.5 - Build 20241212-010</div>
+    <div class="version-info">Versión 2.7.55 - Build 20241212-011</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -287,9 +287,9 @@
 
     <script>
         // Mostrar información de versión en la consola para debug
-        console.log('SmartCookware Web App - Versión 2.7.5');
-        console.log('Build: 20241212-010');
-        console.log('Características: Control por temperatura en primer paso + Timers funcionando');
+        console.log('SmartCookware Web App - Versión 2.7.55');
+        console.log('Build: 20241212-011');
+        console.log('Características: DEBUG - Verificando envío de acción requerida');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -637,7 +637,15 @@
                     tempTarget & 0xFF               // Byte 4: Temperatura low byte
                 ]);
                 
+                // AÑADIR LOGS DE DEBUG
+                console.log(`🔍 DEBUG sendRecipeStep:`);
+                console.log(`   - Step: ${step}/${totalSteps}`);
+                console.log(`   - ActionRequired: ${actionRequired} (enviado como ${actionRequired ? 1 : 0})`);
+                console.log(`   - TempTarget: ${tempTarget}°C`);
+                console.log(`   - Data enviada: [${Array.from(data).join(', ')}]`);
+                
                 await stepsCharacteristic.writeValue(data);
+                console.log(`✅ Datos enviados exitosamente al periférico`);
                 
                 stepInfo.textContent = `Paso: ${step}/${totalSteps}`;
                 
@@ -650,11 +658,15 @@
                 
                 // MOSTRAR "ACCIÓN REQUERIDA" EN LA WEB SI ES NECESARIO
                 if (actionRequired) {
+                    console.log(`🚨 Mostrando ACTION REQUIRED en la web`);
                     actionRequiredCard.classList.remove('hidden');
+                } else {
+                    console.log(`ℹ️ Sin acción requerida - ocultando tarjeta`);
+                    actionRequiredCard.classList.add('hidden');
                 }
                 
             } catch (error) {
-                console.error('Error al enviar paso de receta:', error);
+                console.error('❌ Error al enviar paso de receta:', error);
                 statusText.textContent = 'Error: ' + error.message;
             }
         }
@@ -754,6 +766,7 @@
             }
             
             statusText.textContent = '🥩 Iniciando Filete a la Plancha...';
+            console.log(`🥩 === INICIANDO RECETA FILETE ===`);
             
             // Mostrar tarjeta de progreso para recetas complejas
             recipeProgressCard.classList.remove('hidden');
@@ -762,21 +775,25 @@
             updateRecipeButtons('complex');
             
             // PASO 1: Sin acción requerida, solo esperar temperatura
+            console.log(`📋 PASO 1: Calentando sartén (SIN acción requerida)`);
             await sendRecipeStep(1, 3, false, 240);
             await sendRecipeProgress(240, 240);
             
             // Usar monitoreo de temperatura para el primer paso
             startTemperatureMonitoringWithCallback(240, 300, async () => {
                 // PASO 2: CON ACCIÓN REQUERIDA - Colocar filete
+                console.log(`📋 PASO 2: Colocar filete (CON acción requerida)`);
                 statusText.textContent = '🥩 Colocar filete en la sartén';
                 await sendMessage('Colocar filete');
-                await sendRecipeStep(2, 3, true, 220);  // ✅ CAMBIAR A true
+                await sendRecipeStep(2, 3, true, 220);  // ✅ CON ACCIÓN REQUERIDA
                 await sendRecipeProgressAndWait(300, async () => {
                     // PASO 3: CON ACCIÓN REQUERIDA - Voltear filete
+                    console.log(`📋 PASO 3: Voltear filete (CON acción requerida)`);
                     statusText.textContent = '🥩 Voltear el filete';
                     await sendMessage('Voltear filete');
-                    await sendRecipeStep(3, 3, true, 200);  // ✅ CAMBIAR A true
+                    await sendRecipeStep(3, 3, true, 200);  // ✅ CON ACCIÓN REQUERIDA
                     await sendRecipeProgressAndWait(240, () => {
+                        console.log(`✅ RECETA FILETE COMPLETADA`);
                         statusText.textContent = '🥩 ¡Filete a la Plancha completado!';
                         setpointContainer.classList.add('hidden');
                     });
@@ -798,27 +815,32 @@
             }
 
             statusText.textContent = '🍝 Iniciando Pasta Italiana...';
+            console.log(`🍝 === INICIANDO RECETA PASTA ===`);
 
             recipeProgressCard.classList.remove('hidden');
             
             updateRecipeButtons('complex');
 
             // PASO 1: Sin acción requerida, solo esperar temperatura
+            console.log(`📋 PASO 1: Calentando agua (SIN acción requerida)`);
             await sendRecipeStep(1, 3, false, 100);
             await sendRecipeProgress(480, 480);
             
             // Usar monitoreo de temperatura para el primer paso
             startTemperatureMonitoringWithCallback(100, 480, async () => {
                 // PASO 2: CON ACCIÓN REQUERIDA - Añadir pasta
+                console.log(`📋 PASO 2: Añadir pasta (CON acción requerida)`);
                 statusText.textContent = '🍝 Añadir pasta al agua hirviendo';
                 await sendMessage('Añadir pasta');
-                await sendRecipeStep(2, 3, true, 100);  // ✅ CAMBIAR A true
+                await sendRecipeStep(2, 3, true, 100);  // ✅ CON ACCIÓN REQUERIDA
                 await sendRecipeProgressAndWait(600, async () => {
                     // PASO 3: CON ACCIÓN REQUERIDA - Escurrir pasta
+                    console.log(`📋 PASO 3: Escurrir pasta (CON acción requerida)`);
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendMessage('Escurrir pasta');
-                    await sendRecipeStep(3, 3, true, 0);  // ✅ CAMBIAR A true
+                    await sendRecipeStep(3, 3, true, 0);  // ✅ CON ACCIÓN REQUERIDA
                     await sendRecipeProgressAndWait(60, () => {
+                        console.log(`✅ RECETA PASTA COMPLETADA`);
                         statusText.textContent = '🍝 ¡Pasta Italiana completada!';
                         setpointContainer.classList.add('hidden');
                     });
@@ -1052,8 +1074,6 @@
             }
         }
         
-        // ...existing code...
-        
         function startTemperatureMonitoringWithCallback(targetTemp, timeoutSeconds, callback) {
             stopTemperatureMonitoring();
             stopAutomaticTimer();
@@ -1130,13 +1150,11 @@
             temperatureCheckInterval._savedCallback = callback;
         }
         
-        // ...existing code...
-        
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.5 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-010');
+            console.log('%c SmartCookware Web App v2.7.55 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Temperature monitoring for first step + Working timers');
+            console.log('DEBUG: Verificando envío de ACTION REQUIRED al periférico');
         });
         
         function updateBatteryLevel(value) {
