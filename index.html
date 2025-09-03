@@ -1062,7 +1062,7 @@
         function updateTemperature(value) {
             // Verificar que tenemos al menos 2 bytes antes de leer uint16
             if (value.byteLength >= 2) {
-                const temp = value.getUint16(0, false);
+                const temp = value.getUint16(0, true); // true para little-endian
                 currentTemp.textContent = `${temp}°C`;
             } else {
                 console.error('Error: Datos de temperatura insuficientes, recibidos:', value.byteLength, 'bytes, se esperaban 2');
