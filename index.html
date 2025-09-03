@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.6 - Build 20241212-011</div>
+    <div class="version-info">Versión 2.7.7 - Build 20241212-011</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -287,7 +287,7 @@
 
     <script>
         // Actualizar información de versión en la consola
-        console.log('SmartCookware Web App - Versión 2.7.6');
+        console.log('SmartCookware Web App - Versión 2.7.7');
         console.log('Build: 20241212-011');
         console.log('Características: Botón CONTINUAR equivalente a notificación BLE');
         
@@ -897,7 +897,9 @@
                     await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
                 } catch (error) {
                     console.error('Error enviando actualización de tiempo:', error);
-                    stopAutomaticTimer();
+                    // No detener el timer, solo registrar el error para permitir que el timer continúe 
+                    // y que en el siguiente intento se pueda volver a enviar la actualización
+                    //stopAutomaticTimer();
                 }
                 
             }, 1000);
@@ -971,7 +973,9 @@
                     await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
                 } catch (error) {
                     console.error('Error enviando actualización de tiempo:', error);
-                    stopAutomaticTimer();
+                    // No detener el timer, solo registrar el error para permitir que el timer continúe 
+                    // y que en el siguiente intento se pueda volver a enviar la actualización
+                    //stopAutomaticTimer();
                 }
             }, 1000);
         }
@@ -1039,7 +1043,7 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.6 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('%c SmartCookware Web App v2.7.7 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
             console.log('Build: 20241212-011');
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida');
