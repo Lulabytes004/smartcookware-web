@@ -1070,7 +1070,10 @@
                     batteryStatus.textContent = `Nivel: ${batteryLevel}%`;
                 }
             } else {
-                console.error('Error: Datos de batería insuficientes, recibidos:',
+                console.error('Error: Datos de batería insuficientes, recibidos:', value.byteLength, 'bytes');           
+            }
+        }
+
         
         function updateTemperature(value) {
             // Verificar que tenemos al menos 2 bytes antes de leer uint16
