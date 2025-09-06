@@ -394,9 +394,11 @@
             if (isAdvancedMode) {
                 recipeCard.classList.add('hidden');
                 advancedCard.classList.remove('hidden');
+                connectionCard.classList.add('hidden');  // Ocultar la tarjeta de conexión en modo avanzado
             } else {
                 advancedCard.classList.add('hidden');
                 recipeCard.classList.remove('hidden');
+                connectionCard.classList.remove('hidden');  // Mostrar la tarjeta de conexión en modo simple
             }
         }
         
