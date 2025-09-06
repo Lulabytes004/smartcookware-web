@@ -173,7 +173,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.7.7 - Build 20241212-011</div>
+    <div class="version-info">Versión 2.8.0 - Build 20241212-012</div>
     
     <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -225,6 +225,14 @@
     <!-- Controles avanzados (ocultos por defecto) -->
     <div class="card hidden" id="advancedCard">
         <h2>Controles de Receta</h2>
+
+
+
+        <!-- Estado de la batería -->
+        <div class="input-group">
+            <label>🔋 Estado de Batería:</label>
+            <div id="batteryStatus" style="font-size: 16px; padding: 8px 0;">--</div>
+        </div>
         
         <!-- Control para enviar paso de receta -->
         <div class="input-group">
@@ -287,8 +295,8 @@
 
     <script>
         // Actualizar información de versión en la consola
-        console.log('SmartCookware Web App - Versión 2.7.7');
-        console.log('Build: 20241212-011');
+        console.log('SmartCookware Web App - Versión 2.8.0');
+        console.log('Build: 20241212-012');
         console.log('Características: Botón CONTINUAR equivalente a notificación BLE');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
@@ -1053,11 +1061,16 @@
             // Verificar que tenemos al menos 1 byte antes de leer
             if (value.byteLength >= 1) {
                 const batteryLevel = value.getUint8(0);
-                batteryText.textContent = `Batería: ${batteryLevel}%`;
+                // Ya no actualizar el elemento batteryText en la UI principal
+                // batteryText.textContent = `Batería: ${batteryLevel}%`;
+                
+                // En su lugar, actualizar el elemento en el modo avanzado
+                const batteryStatus = document.getElementById('batteryStatus');
+                if (batteryStatus) {
+                    batteryStatus.textContent = `Nivel: ${batteryLevel}%`;
+                }
             } else {
-                console.error('Error: Datos de batería insuficientes, recibidos:', value.byteLength, 'bytes');
-            }
-        }
+                console.error('Error: Datos de batería insuficientes, recibidos:',
         
         function updateTemperature(value) {
             // Verificar que tenemos al menos 2 bytes antes de leer uint16
