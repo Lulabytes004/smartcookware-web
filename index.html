@@ -175,11 +175,17 @@
     <h1>SmartCookware</h1>
     <div class="version-info">Versión 2.8.0 - Build 20241212-012</div>
     
-    <div class="card">
+    <!-- <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
         <p class="status" id="statusText">Desconectado</p>
         <p class="status" id="batteryText"></p>
+    </div> -->
+
+    <!-- Añadir esta nueva sección de estado al inicio (después de la div de versión, aproximadamente línea 94) -->
+    <div class="card" id="statusCard">
+        <p class="status" id="statusText">Desconectado</p>
     </div>
+
     
     <div class="card hidden" id="recipeProgressCard">
         <h2>Progreso de receta</h2>
@@ -222,17 +228,33 @@
         <button class="advanced-toggle" onclick="toggleAdvancedMode()">🔧 Modo Avanzado</button>
     </div>
 
+
+    <!-- Añadir esta nueva sección de conexión al final (después del botón de Modo Avanzado, aproximadamente línea 292) -->
+    <div class="card" id="connectionCard">
+        <h2>Conexión</h2>
+        <button id="connectButton">Conectar dispositivo</button>
+    </div>
+
+
+
+
+
+
     <!-- Controles avanzados (ocultos por defecto) -->
     <div class="card hidden" id="advancedCard">
-        <h2>Controles de Receta</h2>
 
-
-
-        <!-- Estado de la batería -->
+        <h2>Estado del Dispositivo</h2>
         <div class="input-group">
             <label>🔋 Estado de Batería:</label>
             <div id="batteryStatus" style="font-size: 16px; padding: 8px 0;">--</div>
         </div>
+        
+        <hr style="margin: 20px 0; border-top: 1px solid #ddd;">
+
+
+
+        <h2>Controles de Receta</h2>
+
         
         <!-- Control para enviar paso de receta -->
         <div class="input-group">
@@ -540,7 +562,7 @@
         
         function onDisconnected() {
             statusText.textContent = 'Desconectado';
-            batteryText.textContent = '';
+            // batteryText.textContent = '';
             connectButton.textContent = 'Conectar dispositivo';
             connectButton.removeEventListener('click', disconnectDevice);
             connectButton.addEventListener('click', connectToDevice);
@@ -551,7 +573,11 @@
             actionRequiredCard.classList.add('hidden');
             recipeCard.classList.add('hidden');
             advancedCard.classList.add('hidden');
-            
+
+            // Mostrar explicitamte la tarjeta de estado y conexion
+            statusCard.classList.remove('hidden');
+            connectionCard.classList.remove('hidden');
+
             // Resetear variables
             device = null;
             batteryCharacteristic = null;
@@ -1051,8 +1077,8 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.7.7 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-011');
+            console.log('%c SmartCookware Web App v2.8.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-012');
             console.log('Loaded at:', new Date().toLocaleDateString());
             console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida');
         });
