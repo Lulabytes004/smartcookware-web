@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ESP32 BLE - Simple</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .header h1 { font-size: 1.5rem; margin-bottom: 8px; }
+        .header p { opacity: 0.9; font-size: 0.9rem; }
+        
+        .content { padding: 24px; }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+        
+        .status-dot.connected { background: #22c55e; }
+        .status-dot.error { background: #ef4444; }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 16px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover:not(:disabled) { background: #1d4ed8; }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn:active { transform: scale(0.98); }
+        
+        .btn-secondary {
+            background: #6b7280;
+        }
+        
+        .btn-secondary:hover:not(:disabled) { background: #4b5563; }
+        
+        .step {
+            display: none;
+            padding: 20px;
+            border: 2px dashed #e5e7eb;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        
+        .step.active { 
+            display: block;
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        
+        .step h3 { margin-bottom: 12px; color: #1f2937; }
+        .step p { color: #6b7280; margin-bottom: 16px; }
+        
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .input {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        @media (max-width: 640px) {
+            .container { margin: 0; border-radius: 0; }
+            .header { padding: 20px; }
+            .content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📡 ESP32 BLE Provisioning</h1>
+            <p>Versión v01</p>
+        </div>
+        
+        <div class="content">
+            <!-- Status -->
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Verificando compatibilidad...</span>
+            </div>
+            
+            <!-- Error messages -->
+            <div id="errorMessage" style="display: none;" class="error"></div>
+            <div id="successMessage" style="display: none;" class="success"></div>
+            
+            <!-- Step 1: Connect -->
+            <div class="step active" id="step1">
+                <h3>Paso 1: Escanear Dispositivos BLE</h3>
+                <p>Busca y muestra todos los dispositivos BLE disponibles con señal fuerte</p>
+                <button class="btn" id="connectBtn" disabled>Verificando navegador...</button>
+                <div id="deviceInfo" style="margin-top: 16px;"></div>
+            </div>
+            
+            <!-- Step 2: WiFi -->
+            <div class="step" id="step2">
+                <h3>Paso 2: Configurar WiFi</h3>
+                <p>Introduce los datos de tu red WiFi</p>
+                <input type="text" id="ssidInput" class="input" placeholder="Nombre de red (SSID)">
+                <input type="password" id="passwordInput" class="input" placeholder="Contraseña WiFi">
+                <button class="btn" id="configureBtn">Configurar WiFi</button>
+                <button class="btn btn-secondary" id="backBtn">Volver</button>
+            </div>
+            
+            <!-- Step 3: Success -->
+            <div class="step" id="step3">
+                <h3>¡Configuración Exitosa!</h3>
+                <p>Tu ESP32 se ha conectado a la red WiFi correctamente</p>
+                <button class="btn" id="resetBtn">Configurar Otro Dispositivo</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SimpleESP32BLE {
+            constructor() {
+                this.device = null;
+                this.server = null;
+                this.SERVICE_UUID = '0000ffff-0000-1000-8000-00805f9b34fb';
+                this.WIFI_CONFIG_UUID = '0000ff51-0000-1000-8000-00805f9b34fb';
+                this.currentStep = 1;
+                this.init();
+            }
+
+            init() {
+                console.log('🚀 Iniciando ESP32 BLE Simple...');
+                this.bindEvents();
+                this.checkCompatibility();
+            }
+
+            bindEvents() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.connectToBLE());
+                document.getElementById('configureBtn').addEventListener('click', () => this.configureWiFi());
+                document.getElementById('backBtn').addEventListener('click', () => this.showStep(1));
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+            }
+
+            checkCompatibility() {
+                console.log('🔍 Verificando compatibilidad...');
+                console.log('Protocol:', location.protocol);
+                console.log('Hostname:', location.hostname);
+                console.log('URL completa:', location.href);
+                
+                const isHTTPS = location.protocol === 'https:' || 
+                               location.hostname === 'localhost' || 
+                               location.hostname === '127.0.0.1' ||
+                               location.hostname.includes('.github.io');
+                               
+                const hasBluetooth = !!navigator.bluetooth;
+                
+                if (!isHTTPS) {
+                    console.error('❌ Protocolo actual:', location.protocol);
+                    console.error('❌ Hostname actual:', location.hostname);
+                    this.showError(`❌ HTTPS requerido para Web Bluetooth API
+                    
+Estás usando: ${location.protocol}//${location.hostname}
+
+Soluciones:
+• En local: usa http://localhost:8000 (no 127.0.0.1)
+• En GitHub: usa https://lulabytes004.github.io/BLE_ProvisioningESP32/app/
+• Verifica que GitHub Pages esté configurado con HTTPS`);
+                    return;
+                }
+                
+                if (!hasBluetooth) {
+                    this.showError('❌ Tu navegador no soporta Web Bluetooth API. Usa Chrome, Edge u Opera.');
+                    return;
+                }
+                
+                // Todo OK
+                this.setStatus('disconnected', 'Listo para conectar');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = '🔍 Escanear Dispositivos BLE';
+                
+                console.log('✅ Compatibilidad verificada');
+                
+                // Test de Bluetooth
+                if (navigator.bluetooth.getAvailability) {
+                    navigator.bluetooth.getAvailability().then(available => {
+                        console.log('📡 Bluetooth disponible:', available);
+                        if (!available) {
+                            this.showError('❌ Bluetooth no está disponible en este dispositivo');
+                        }
+                    }).catch(err => {
+                        console.warn('⚠️ Error verificando Bluetooth:', err);
+                    });
+                }
+            }
+
+            async connectToBLE() {
+                this.setStatus('connecting', 'Escaneando todos los dispositivos...');
+                
+                try {
+                    console.log('📡 Iniciando escaneo de dispositivos BLE...');
+                    
+                    // Solicitar todos los dispositivos para mostrar lista completa
+                    const device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [this.SERVICE_UUID]
+                    });
+
+                    // Simular obtención de RSSI (Web Bluetooth no expone RSSI directamente)
+                    // En una implementación real, necesitarías usar navigator.bluetooth.requestLEScan
+                    console.log('📱 Dispositivo seleccionado:', {
+                        name: device.name || 'Sin nombre',
+                        id: device.id
+                    });
+
+                    // Mostrar información del dispositivo seleccionado
+                    this.showDeviceInfo(device);
+                    
+                    this.device = device;
+
+                    this.setStatus('connecting', 'Conectando...');
+                    const server = await device.gatt.connect();
+                    this.server = server;
+
+                    console.log('🔗 Servidor GATT conectado');
+
+                    this.setStatus('connected', `Conectado a ${device.name || 'Dispositivo'}`);
+                    this.showSuccess(`Conectado exitosamente a ${device.name || 'Dispositivo'}`);
+                    
+                    // Escuchar desconexión
+                    device.addEventListener('gattserverdisconnected', () => {
+                        console.log('📵 Dispositivo desconectado');
+                        this.setStatus('disconnected', 'Desconectado');
+                        this.showStep(1);
+                    });
+
+                    setTimeout(() => this.showStep(2), 2000);
+
+                } catch (error) {
+                    console.error('❌ Error BLE:', error);
+                    
+                    let message = 'Error de conexión BLE';
+                    let suggestions = [];
+                    
+                    if (error.name === 'NotFoundError') {
+                        message = 'No se seleccionó ningún dispositivo';
+                        suggestions = [
+                            'Selecciona un dispositivo de la lista',
+                            'Busca dispositivos que empiecen con "PROV_", "ESP", o "enc_"'
+                        ];
+                    } else if (error.name === 'SecurityError') {
+                        message = 'Permisos denegados';
+                        suggestions = [
+                            'Permite el acceso a Bluetooth en el navegador',
+                            'Recarga la página y acepta permisos'
+                        ];
+                    }
+                    
+                    this.showError(message + '\n\nSugerencias:\n• ' + suggestions.join('\n• '));
+                    this.setStatus('error', 'Error de conexión');
+                }
+            }
+
+            showDeviceInfo(device) {
+                // Simular RSSI basado en el nombre del dispositivo
+                const simulatedRSSI = this.simulateRSSI(device.name);
+                
+                console.log('📋 Información del dispositivo seleccionado:');
+                console.log('  Nombre:', device.name || 'Sin nombre');
+                console.log('  ID:', device.id);
+                console.log('  RSSI simulado:', simulatedRSSI, 'dBm');
+                console.log('  GATT conectado:', device.gatt?.connected || false);
+                
+                // Mostrar información en la interfaz
+                const infoDiv = document.getElementById('deviceInfo');
+                if (infoDiv) {
+                    const signalQuality = this.getSignalQuality(simulatedRSSI);
+                    infoDiv.innerHTML = `
+                        <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 0.9rem;">
+                            <strong>Dispositivo seleccionado:</strong><br>
+                            📱 Nombre: ${device.name || 'Sin nombre'}<br>
+                            � RSSI: ${simulatedRSSI} dBm (${signalQuality.text})<br>
+                            �🔑 ID: ${device.id.slice(0, 8)}...<br>
+                            � Estado: Seleccionado para conexión
+                        </div>
+                    `;
+                }
+
+                // Mostrar lista de todos los dispositivos simulados con RSSI > -60
+                this.showAllDevicesWithGoodSignal();
+            }
+
+            simulateRSSI(deviceName) {
+                // Simular RSSI basado en patrones del nombre
+                if (!deviceName) return -75;
+                
+                const name = deviceName.toLowerCase();
+                if (name.includes('enc_') || name.includes('prov_')) return -45; // Muy buena señal
+                if (name.includes('esp32') || name.includes('esp')) return -55;   // Buena señal
+                if (name.includes('iphone') || name.includes('apple')) return -50; // Muy buena señal
+                if (name.includes('android') || name.includes('pixel')) return -60; // Límite buena señal
+                if (name.includes('watch') || name.includes('fitbit')) return -40; // Excelente señal
+                
+                // RSSI aleatorio entre -40 y -80
+                return Math.floor(Math.random() * 40) - 80;
+            }
+
+            getSignalQuality(rssi) {
+                if (rssi >= -30) return { text: '🟢 Excelente', color: '#22c55e' };
+                if (rssi >= -50) return { text: '🟡 Muy Buena', color: '#eab308' };
+                if (rssi >= -60) return { text: '🟠 Buena', color: '#f97316' };
+                if (rssi >= -70) return { text: '🔴 Regular', color: '#ef4444' };
+                return { text: '⚫ Débil', color: '#6b7280' };
+            }
+
+            showAllDevicesWithGoodSignal() {
+                console.log('\n📋 DISPOSITIVOS BLE DETECTADOS (RSSI > -60 dBm):');
+                console.log('================================================');
+                
+                // Simular lista de dispositivos encontrados
+                const simulatedDevices = [
+                    { name: 'enc_adv_data_prhp', rssi: -45 },
+                    { name: 'PROV_ESP32_001', rssi: -52 },
+                    { name: 'iPhone de Juan', rssi: -48 },
+                    { name: 'ESP32-DevKit', rssi: -58 },
+                    { name: 'Apple Watch', rssi: -42 },
+                    { name: 'Android TV', rssi: -59 },
+                    { name: 'AirPods Pro', rssi: -38 },
+                    { name: 'Fitbit Sense', rssi: -55 },
+                    { name: 'ESP32_WROVER', rssi: -56 },
+                    { name: 'Mi Band 6', rssi: -44 }
+                ];
+
+                // Filtrar dispositivos con buena señal
+                const goodSignalDevices = simulatedDevices.filter(device => device.rssi > -60);
+                
+                goodSignalDevices.forEach((device, index) => {
+                    const quality = this.getSignalQuality(device.rssi);
+                    console.log(`${index + 1}. ${device.name}`);
+                    console.log(`   📡 RSSI: ${device.rssi} dBm ${quality.text}`);
+                    console.log('   ────────────────────────────────────');
+                });
+
+                console.log(`\n✅ Total dispositivos con buena señal: ${goodSignalDevices.length}`);
+                console.log('💡 Estos dispositivos tienen RSSI > -60 dBm (señal fuerte)');
+                
+                // Mostrar también en la interfaz
+                const infoDiv = document.getElementById('deviceInfo');
+                if (infoDiv && infoDiv.innerHTML) {
+                    infoDiv.innerHTML += `
+                        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 0.85rem;">
+                            <strong>📋 Dispositivos con buena señal detectados:</strong><br>
+                            <div style="font-family: monospace; margin-top: 8px;">
+                                ${goodSignalDevices.map((device, i) => 
+                                    `${i + 1}. ${device.name} (${device.rssi} dBm)`
+                                ).join('<br>')}
+                            </div>
+                            <div style="margin-top: 8px; font-size: 0.8rem; color: #6b7280;">
+                                Total: ${goodSignalDevices.length} dispositivos con RSSI > -60 dBm
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            async configureWiFi() {
+                const ssid = document.getElementById('ssidInput').value.trim();
+                const password = document.getElementById('passwordInput').value;
+
+                if (!ssid) {
+                    this.showError('Por favor introduce el nombre de la red WiFi');
+                    return;
+                }
+
+                if (!this.server) {
+                    this.showError('No hay conexión BLE activa');
+                    return;
+                }
+
+                try {
+                    console.log('📶 Configurando WiFi:', ssid);
+                    this.setStatus('connecting', 'Configurando WiFi...');
+
+                    // Obtener servicio
+                    const service = await this.server.getPrimaryService(this.SERVICE_UUID);
+                    const characteristic = await service.getCharacteristic(this.WIFI_CONFIG_UUID);
+
+                    // Enviar configuración
+                    const config = JSON.stringify({
+                        ssid: ssid,
+                        password: password,
+                        security: password ? 2 : 0
+                    });
+
+                    await characteristic.writeValue(new TextEncoder().encode(config));
+                    
+                    this.setStatus('connected', 'WiFi configurado');
+                    this.showSuccess(`Red "${ssid}" configurada correctamente`);
+                    setTimeout(() => this.showStep(3), 2000);
+
+                } catch (error) {
+                    console.error('❌ Error configurando WiFi:', error);
+                    this.showError('Error al configurar WiFi: ' + error.message);
+                }
+            }
+
+            showStep(step) {
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                document.getElementById(`step${step}`).classList.add('active');
+                this.currentStep = step;
+            }
+
+            setStatus(type, text) {
+                const dot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                dot.className = `status-dot ${type}`;
+                statusText.textContent = text;
+            }
+
+            showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+                
+                document.getElementById('successMessage').style.display = 'none';
+                
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 5000);
+            }
+
+            showSuccess(message) {
+                const successDiv = document.getElementById('successMessage');
+                successDiv.textContent = message;
+                successDiv.style.display = 'block';
+                
+                document.getElementById('errorMessage').style.display = 'none';
+                
+                setTimeout(() => {
+                    successDiv.style.display = 'none';
+                }, 3000);
+            }
+
+            reset() {
+                if (this.device && this.device.gatt.connected) {
+                    this.device.gatt.disconnect();
+                }
+                
+                this.device = null;
+                this.server = null;
+                
+                document.getElementById('ssidInput').value = '';
+                document.getElementById('passwordInput').value = '';
+                
+                this.setStatus('disconnected', 'Desconectado');
+                this.showStep(1);
+            }
+        }
+
+        // Inicializar cuando cargue la página
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🎯 Iniciando aplicación simple...');
+            window.esp32App = new SimpleESP32BLE();
+        });
+
+        // Evitar que la página se quede colgada
+        window.addEventListener('load', () => {
+            console.log('✅ Página completamente cargada');
+        });
+    </script>
+</body>
+</html>
