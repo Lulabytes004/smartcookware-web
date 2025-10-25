@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartCookware - Control BLE</title>
+    <title>SmartCookware - Control BLE v2.9.2</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -43,6 +43,7 @@
             font-size: 14px;
             color: #555;
             text-align: center;
+            white-space: pre-line;
         }
         .progress-container {
             width: 100%;
@@ -173,7 +174,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.8.0 - Build 20241212-012</div>
+    <div class="version-info">Versión 2.9.2 - Build 20241212-014</div>
     
     <!-- <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -225,7 +226,10 @@
             <button class="utility-button" onclick="nextStep()">Siguiente Paso</button>
         </div>
 
-        <button class="advanced-toggle" onclick="toggleAdvancedMode()">🔧 Modo Avanzado</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="advanced-toggle" onclick="toggleAdvancedMode()" style="flex: 1;">🔧 Modo Avanzado</button>
+            <button class="advanced-toggle" onclick="showBRALogo()" style="flex: 1;">🏷️ Mostrar Logo BRA</button>
+        </div>
     </div>
 
 
@@ -317,9 +321,9 @@
 
     <script>
         // Actualizar información de versión en la consola
-        console.log('SmartCookware Web App - Versión 2.8.0');
-        console.log('Build: 20241212-012');
-        console.log('Características: Botón CONTINUAR equivalente a notificación BLE');
+        console.log('SmartCookware Web App - Versión 2.9.2');
+        console.log('Build: 20241212-014');
+        console.log('Características: Botón CONTINUAR equivalente a notificación BLE + Logo BRA + Mensaje pasta en dos líneas');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -333,6 +337,7 @@
         const STEPS_CHARACTERISTIC_UUID = 'abcd1234-0003-9012-3456-7890abcdef12';
         const MESSAGE_CHARACTERISTIC_UUID = 'abcd1234-0004-9012-3456-7890abcdef12';
         const CONTINUE_CHARACTERISTIC_UUID = 'abcd1234-0005-9012-3456-7890abcdef12';
+        const SHOW_BRA_LOGO_CHARACTERISTIC_UUID = 'abcd1234-0006-9012-3456-7890abcdef12';
         
         // Variables para el contador de tiempo automático
         let timerInterval = null;
@@ -353,6 +358,7 @@
         let stepsCharacteristic = null;
         let messageCharacteristic = null;
         let continueCharacteristic = null;
+        let showBraLogoCharacteristic = null;
         
         // Estado del modo avanzado
         let isAdvancedMode = false;
@@ -527,6 +533,7 @@
                 stepsCharacteristic = await cookingService.getCharacteristic('abcd1234-0003-9012-3456-7890abcdef12');
                 messageCharacteristic = await cookingService.getCharacteristic('abcd1234-0004-9012-3456-7890abcdef12');
                 continueCharacteristic = await cookingService.getCharacteristic('abcd1234-0005-9012-3456-7890abcdef12');
+                showBraLogoCharacteristic = await cookingService.getCharacteristic('abcd1234-0006-9012-3456-7890abcdef12');
                 
                 await tempCharacteristic.startNotifications();
                 tempCharacteristic.addEventListener('characteristicvaluechanged', handleTemperatureChange);
@@ -588,6 +595,7 @@
             stepsCharacteristic = null;
             messageCharacteristic = null;
             continueCharacteristic = null;
+            showBraLogoCharacteristic = null;
             isAdvancedMode = false;
             
             // Rehabilitar todos los botones al desconectar
@@ -671,7 +679,30 @@
                     }
                 }
                 
-                statusText.textContent = 'Acción completada';
+                // 4. Actualizar el mensaje de estado según el paso actual
+                if (currentStep === 2 && window.totalSteps === 3) {
+                    // Paso 2 de 3 - después de añadir pasta o voltear filete
+                    if (currentTempTarget === 100) {
+                        // Es la receta de pasta
+                        statusText.textContent = '🍝 Hirviendo la pasta...';
+                    } else if (currentTempTarget === 220) {
+                        // Es la receta de filete
+                        statusText.textContent = '🥩 Cocinando el filete...';
+                    } else {
+                        statusText.textContent = 'Acción completada - Continuando...';
+                    }
+                } else if (currentStep === 3 && window.totalSteps === 3) {
+                    // Paso 3 de 3 - después de escurrir pasta o voltear filete segunda vez
+                    if (currentTempTarget === 200) {
+                        // Es la receta de filete en el último paso
+                        statusText.textContent = '🥩 Terminando el filete...';
+                    } else {
+                        statusText.textContent = 'Acción completada - Finalizando...';
+                    }
+                } else {
+                    statusText.textContent = 'Acción completada';
+                }
+                
             } catch (error) {
                 console.error('Error al enviar señal de continuar:', error);
                 statusText.textContent = 'Error: ' + error.message;
@@ -802,9 +833,9 @@
         }
         
         async function sendRecipeProgressWithTimer(totalTime) {
-            const remainingTime = totalTime;
-            await sendRecipeProgress(remainingTime, totalTime);
-            startAutomaticTimer(remainingTime, totalTime);
+            const remaining = totalTime;
+            await sendRecipeProgress(remaining, totalTime);
+            startAutomaticTimer(remaining, totalTime);
         }
         
         async function startSteakRecipe() {
@@ -813,7 +844,7 @@
                 return;
             }
             
-            statusText.textContent = '🥩 Iniciando Filete a la Plancha...';
+            statusText.textContent = '🥩 Iniciando Filete a la Plancha...\nPrecalentando sartén...';
             
             // Mostrar tarjeta de progreso para recetas complejas
             recipeProgressCard.classList.remove('hidden');
@@ -855,7 +886,7 @@
                 return;
             }
 
-            statusText.textContent = '🍝 Iniciando Pasta Italiana...';
+            statusText.textContent = '🍝 Iniciando Pasta Italiana...\nPrecalentando agua...';
 
             // Mostrar tarjeta de progreso para recetas complejas
             recipeProgressCard.classList.remove('hidden');
@@ -874,7 +905,7 @@
                     statusText.textContent = '🍝 Escurrir la pasta';
                     await sendMessage('Escurrir pasta');
                     await sendRecipeStep(3, 3, true, 0);
-                    await sendRecipeProgressAndWait(60, () => {
+                    await sendRecipeProgressAndWait(15, () => {
                         statusText.textContent = '🍝 ¡Pasta Italiana completada!';
                         // Ocultar temperatura objetivo cuando la receta termina
                         setpointContainer.classList.add('hidden');
@@ -1079,10 +1110,10 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.8.0 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-012');
+            console.log('%c SmartCookware Web App v2.9.2 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-014');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida');
+            console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida + Botón Logo BRA + Mensaje pasta en dos líneas');
         });
         
         function updateBatteryLevel(value) {
@@ -1110,6 +1141,32 @@
                 currentTemp.textContent = `${temp}°C`;
             } else {
                 console.error('Error: Datos de temperatura insuficientes, recibidos:', value.byteLength, 'bytes, se esperaban 2');
+            }
+        }
+
+        // Nueva función para mostrar el logo BRA
+        async function showBRALogo() {
+            if (!device || !device.gatt.connected) {
+                alert('Dispositivo no conectado');
+                return;
+            }
+            
+            if (!showBraLogoCharacteristic) {
+                alert('Característica ShowBraLogo no disponible');
+                return;
+            }
+            
+            try {
+                // Enviar comando para mostrar logo BRA
+                const showBraLogoCommand = new Uint8Array([1]);
+                await showBraLogoCharacteristic.writeValue(showBraLogoCommand);
+                
+                console.log('📤 Comando enviado para mostrar logo BRA');
+                
+            } catch (error) {
+                console.error('Error al enviar comando de logo BRA:', error);
+                statusText.textContent = 'Error: ' + error.message;
+                alert('Error al mostrar logo BRA: ' + error.message);
             }
         }
     </script>
