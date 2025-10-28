@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartCookware - Control BLE v2.9.2</title>
+    <title>SmartCookware - Control BLE v2.9.3</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -174,7 +174,7 @@
 </head>
 <body>
     <h1>SmartCookware</h1>
-    <div class="version-info">Versión 2.9.2 - Build 20241212-014</div>
+    <div class="version-info">Versión 2.9.3 - Build 20241212-015</div>
     
     <!-- <div class="card">
         <button id="connectButton">Conectar dispositivo</button>
@@ -321,9 +321,9 @@
 
     <script>
         // Actualizar información de versión en la consola
-        console.log('SmartCookware Web App - Versión 2.9.2');
-        console.log('Build: 20241212-014');
-        console.log('Características: Botón CONTINUAR equivalente a notificación BLE + Logo BRA + Mensaje pasta en dos líneas');
+        console.log('SmartCookware Web App - Versión 2.9.3');
+        console.log('Build: 20241212-015');
+        console.log('Características: Fix timer temperatura + Botón CONTINUAR + Logo BRA + Mensajes en dos líneas');
         
         // UUIDs de los servicios y características BLE - usando formato UUID completo
         // Para los servicios estándar, usamos el formato completo
@@ -344,8 +344,9 @@
         let currentRemainingTime = 0;
         let currentTotalTime = 0;
         let isTimerActive = false;
+        let temperatureAccelerationTriggered = false;
         
-        // Variables para rastrear el paso actual de la receta
+        // Variables para rastrear el paso current de la receta
         let currentStep = 0;
         let totalSteps = 0;
         let currentTempTarget = 0;
@@ -979,6 +980,7 @@
             currentRemainingTime = remainingTime;
             currentTotalTime = totalTime;
             isTimerActive = true;
+            temperatureAccelerationTriggered = false;
 
             console.log(`🚀 Iniciando timer con callback: ${remainingTime}s de ${totalTime}s` + 
                 (targetTemperature ? ` (con monitoreo de temperatura: ${targetTemperature}°C)` : ''));
@@ -991,8 +993,8 @@
                     return;
                 }
                 
-                // Comprobar temperatura si tenemos un valor objetivo
-                if (targetTemperature !== null) {
+                // Comprobar temperatura si tenemos un valor objetivo y no se ha activado ya la aceleración
+                if (targetTemperature !== null && !temperatureAccelerationTriggered) {
                     // Leer temperatura actual del elemento DOM
                     const currentTempText = currentTemp.textContent;
                     const currentTempValue = parseInt(currentTempText.replace('°C', ''));
@@ -1003,6 +1005,7 @@
                         // Acelerar el timer a 5 segundos restantes
                         currentRemainingTime = 5;
                         updateTimeDisplay(currentRemainingTime, currentTotalTime);
+                        temperatureAccelerationTriggered = true;
                         
                         try {
                             await sendRecipeProgressUpdate(currentRemainingTime, currentTotalTime);
@@ -1052,6 +1055,7 @@
                 clearInterval(timerInterval);
                 timerInterval = null;
                 isTimerActive = false;
+                temperatureAccelerationTriggered = false;
                 console.log('⏹️ Timer detenido');
             }
         }
@@ -1110,10 +1114,10 @@
         }
         
         window.addEventListener('load', () => {
-            console.log('%c SmartCookware Web App v2.9.2 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
-            console.log('Build: 20241212-014');
+            console.log('%c SmartCookware Web App v2.9.3 ', 'background: #4CAF50; color: white; font-weight: bold; padding: 5px;');
+            console.log('Build: 20241212-015');
             console.log('Loaded at:', new Date().toLocaleDateString());
-            console.log('New features: Botón CONTINUAR reenvía paso sin acción requerida + Botón Logo BRA + Mensaje pasta en dos líneas');
+            console.log('New features: Fix timer temperatura + Botón CONTINUAR + Logo BRA + Mensajes pasta/filete');
         });
         
         function updateBatteryLevel(value) {
